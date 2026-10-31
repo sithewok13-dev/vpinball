@@ -53,6 +53,15 @@ class MainViewModel: ObservableObject {
     @Published var errorMessage = ""
     @Published var showError = false
 
+    @Published var importSummary = ""
+    @Published var showImportSummary = false
+
+    @Published var pendingExtrasFolder: URL?
+    @Published var showChooseTableForExtras = false
+
+    @Published var missingRoms: [String] = []
+    @Published var showMissingRom = false
+
     @Published var openURL: URL? {
         didSet { handleOpenURL() }
     }
@@ -272,10 +281,89 @@ class MainViewModel: ObservableObject {
 
     func handlePlayTable() {
         if let selectedTable = selectedTable {
+            let missing = RomCheck.missingRoms(for: selectedTable)
+            if !missing.isEmpty {
+                missingRoms = missing
+                showMissingRom = true
+                return
+            }
+            handlePlayTableAnyway()
+        }
+    }
+
+    func handlePlayTableAnyway() {
+        if let selectedTable = selectedTable {
             Task {
                 await VPinballManager.shared.play(table: selectedTable)
             }
         }
+    }
+
+    func handleShowImportSummary(_ result: TableManager.ImportResult) {
+        var lines: [String] = []
+        switch result.tables.count {
+        case 0:
+            break
+        case 1:
+            lines.append("Added \"\(result.tables[0].name)\".")
+        default:
+            lines.append("Added \(result.tables.count) tables.")
+        }
+        if let table = result.extrasAttachedTo {
+            lines.append("Added the files to \"\(table.name)\".")
+        }
+        if !result.roms.isEmpty {
+            lines.append("Installed the ROM\(result.roms.count > 1 ? "s" : "") \(result.roms.joined(separator: ", ")).")
+        }
+        if !result.scriptFixes.isEmpty {
+            lines.append("Applied the community's mobile fix to the script.")
+        }
+        for table in result.tables {
+            let missing = RomCheck.missingRoms(for: table)
+            if !missing.isEmpty {
+                lines.append("\"\(table.name)\" needs the ROM \(missing[0]).zip: import it the same way.")
+            }
+        }
+
+        // a plain table with nothing more to say needs no message
+        if result.tables.count == 1 && lines.count == 1 && result.roms.isEmpty {
+            return
+        }
+        if lines.isEmpty {
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.importSummary = lines.joined(separator: "\n")
+            self.showImportSummary = true
+        }
+    }
+
+    func handleChooseTableForExtras(folder: URL) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.pendingExtrasFolder = folder
+            self.showChooseTableForExtras = true
+        }
+    }
+
+    func handleAttachExtras(to table: Table) {
+        guard let folder = pendingExtrasFolder else { return }
+        pendingExtrasFolder = nil
+        if TableManager.shared.attachPendingExtras(folder, to: table) {
+            scrollToTable = table
+            var result = TableManager.ImportResult()
+            result.extrasAttachedTo = table
+            handleShowImportSummary(result)
+        } else {
+            handleShowError(message: "Unable to add the files to \"\(table.name)\"")
+        }
+    }
+
+    func handleCancelAttachExtras() {
+        if let folder = pendingExtrasFolder {
+            _ = TableFileOperations.deleteDirectory(folder.deletingLastPathComponent())
+        }
+        pendingExtrasFolder = nil
     }
 
     func handleShowError(message: String) {

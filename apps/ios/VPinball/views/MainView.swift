@@ -182,7 +182,7 @@ private struct MainSheets: ViewModifier {
                            .ignoresSafeArea()
                    })
             .fileImporter(isPresented: $mainViewModel.showImportTable,
-                          allowedContentTypes: [.vpx, .vpxz, .vpz, .zip])
+                          allowedContentTypes: [.vpx, .vpxz, .vpz, .zip, .directb2s, .vbscript])
             { result in
                 if case let .success(url) = result {
                     mainViewModel.importTableURL = url
@@ -198,6 +198,46 @@ private struct MainSheets: ViewModifier {
                            .presentationDragIndicator(.hidden)
                            .ignoresSafeArea()
                    })
+            .sheet(isPresented: $mainViewModel.showChooseTableForExtras,
+                   onDismiss: {
+                       mainViewModel.handleCancelAttachExtras()
+                   },
+                   content: {
+                       ChooseTableView(title: mainViewModel.pendingExtrasFolder?.lastPathComponent ?? "") { table in
+                           mainViewModel.handleAttachExtras(to: table)
+                       }
+                       .presentationDetents([.medium, .large])
+                   })
+    }
+}
+
+/// The tables to pick from for files whose table couldn't be told from their names.
+private struct ChooseTableView: View {
+    let title: String
+    let onChoose: (Table) -> Void
+
+    @ObservedObject var vpinballModel = VPinballModel.shared
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(vpinballModel.tables.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }) { table in
+                Button(table.name) {
+                    onChoose(table)
+                    dismiss()
+                }
+                .tint(.primary)
+            }
+            .navigationTitle("Which table is \"\(title)\" for?")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -261,6 +301,24 @@ private struct MainAlerts: ViewModifier {
                     mainViewModel.handleRenameTable()
                 }
                 Button("Cancel", role: .cancel) {}
+            }
+            .alert("Imported", isPresented: $mainViewModel.showImportSummary) {
+                Button("OK") {}
+            }
+            message: {
+                Text("\n\(mainViewModel.importSummary)")
+            }
+            .alert("ROM Missing", isPresented: $mainViewModel.showMissingRom) {
+                Button("Play Anyway") {
+                    mainViewModel.handlePlayTableAnyway()
+                }
+                Button("Learn More") {
+                    Link.troubleshooting.open()
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+            message: {
+                Text("\nThis table needs the ROM \(mainViewModel.missingRoms.first ?? "").zip. Import it with the + button or open it in the Files app; ROMs are shared by all your tables.")
             }
             .alert("TILT!",
                    isPresented: $mainViewModel.showError)

@@ -85,6 +85,26 @@ enum TableFileOperations {
         return tables
     }
 
+    /// A file copied over what's there, or a folder merged into what's there: its files
+    /// replace those of the same name, the others are kept.
+    static func copyMerging(from: URL, to: URL) -> Bool {
+        let isDirectory = (try? from.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        if !isDirectory {
+            return copy(from: from, to: to)
+        }
+
+        if !createDirectory(to) {
+            return false
+        }
+        let contents = (try? FileManager.default.contentsOfDirectory(at: from, includingPropertiesForKeys: [.isDirectoryKey])) ?? []
+        for item in contents where item.lastPathComponent != ".DS_Store" {
+            if !copyMerging(from: item, to: to.appendingPathComponent(item.lastPathComponent)) {
+                return false
+            }
+        }
+        return true
+    }
+
     static func copyDirectory(from: URL, to: URL) -> Bool {
         do {
             if exists(to) {

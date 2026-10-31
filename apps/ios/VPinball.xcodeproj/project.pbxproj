@@ -45,6 +45,8 @@
 		C1D5C4052E9B52750059F90F /* VPinballIOSStartup.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D5C4032E9B52750059F90F /* VPinballIOSStartup.swift */; };
 		C1D90AE52C9A6007006CB735 /* SettingsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1D90AE42C9A6007006CB735 /* SettingsModel.swift */; };
 		C1F802E62E9926EB00A99C73 /* TableManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F802E52E9926EB00A99C73 /* TableManager.swift */; };
+		83E624A1ACABE361953FCADB /* RomCheck.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00F2F79368ED44829B489DDB /* RomCheck.swift */; };
+		03DD71DB1A1BA51B4666840C /* ScriptPatches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81D37A17364C9DA22CFDDC72 /* ScriptPatches.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -113,6 +115,8 @@
 		C1D5C4032E9B52750059F90F /* VPinballIOSStartup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VPinballIOSStartup.swift; sourceTree = "<group>"; };
 		C1D90AE42C9A6007006CB735 /* SettingsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsModel.swift; sourceTree = "<group>"; };
 		C1F802E52E9926EB00A99C73 /* TableManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TableManager.swift; sourceTree = "<group>"; };
+		00F2F79368ED44829B489DDB /* RomCheck.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RomCheck.swift; sourceTree = "<group>"; };
+		81D37A17364C9DA22CFDDC72 /* ScriptPatches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptPatches.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -221,6 +225,8 @@
 				C1A3F0E02F3C1A0000A4E74D /* HapticsManager.swift */,
 				C15528C32EA016BA005CBB91 /* TableFileOperations.swift */,
 				C1F802E52E9926EB00A99C73 /* TableManager.swift */,
+				00F2F79368ED44829B489DDB /* RomCheck.swift */,
+				81D37A17364C9DA22CFDDC72 /* ScriptPatches.swift */,
 				C1610F1B2C4BE8930049ED87 /* ViewModifiers.swift */,
 				C12124602D04725900EB0481 /* VPinballInterop.swift */,
 				C119B03A2C32D48A00A4E74D /* VPinballManager.swift */,
@@ -367,6 +373,8 @@
 				C119B03B2C32D48A00A4E74D /* VPinballManager.swift in Sources */,
 				C1A3F0E12F3C1A0000A4E74D /* HapticsManager.swift in Sources */,
 				C1F802E62E9926EB00A99C73 /* TableManager.swift in Sources */,
+				83E624A1ACABE361953FCADB /* RomCheck.swift in Sources */,
+				03DD71DB1A1BA51B4666840C /* ScriptPatches.swift in Sources */,
 				C15DE57C2C75A324001F1D13 /* CodeWebView.swift in Sources */,
 				C1320F602C8E56BD00035C0F /* HUDOverlayView.swift in Sources */,
 				C16266422C29955E0002FD15 /* MainView.swift in Sources */,

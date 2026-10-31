@@ -45,6 +45,14 @@ extension UTType {
     static var vpz: UTType {
         UTType(exportedAs: "org.vpinball.vpz")
     }
+
+    static var directb2s: UTType {
+        UTType(importedAs: "org.vpinball.directb2s")
+    }
+
+    static var vbscript: UTType {
+        UTType(importedAs: "org.vpinball.vbs")
+    }
 }
 
 extension View {

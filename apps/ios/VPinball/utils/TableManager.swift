@@ -89,11 +89,11 @@ class TableManager {
 
         try? await Task.sleep(nanoseconds: 100_000_000)
 
-        let importedTable = await performImport(url: stagedURL) { progress in
+        let imported = await performImport(url: stagedURL) { progress in
             await MainActor.run {
                 VPinballModel.shared.updateHUD(
                     progress: progress,
-                    status: isArchive ? "Importing archive" : "Importing table"
+                    status: progress >= 97 ? "Checking script" : (isArchive ? "Importing archive" : "Importing")
                 )
             }
         }
@@ -107,11 +107,21 @@ class TableManager {
 
         VPinballModel.shared.hideHUD()
 
-        if let table = importedTable {
+        guard let imported else {
+            return false
+        }
+
+        if let table = imported.tables.first ?? imported.extrasAttachedTo {
             MainViewModel.shared.scrollToTable = table
         }
 
-        return importedTable != nil
+        if let pending = imported.pendingExtras {
+            MainViewModel.shared.handleChooseTableForExtras(folder: pending)
+        } else {
+            MainViewModel.shared.handleShowImportSummary(imported)
+        }
+
+        return !imported.isEmpty
     }
 
     func deleteTable(table: Table) async -> Bool {
@@ -145,6 +155,7 @@ class TableManager {
         if result {
             tables.removeAll { $0.uuid == table.uuid }
             saveTables()
+            RomCheck.forget(tablePath: table.path)
         }
 
         return result
@@ -718,36 +729,73 @@ class TableManager {
         return result
     }
 
-    private func performImport(url: URL, onProgress: ((Int) async -> Void)? = nil) async -> Table? {
+    /// What an import brought in.
+    struct ImportResult {
+        var tables: [Table] = []
+        var roms: [String] = []
+        var extrasAttachedTo: Table?
+        var scriptFixes: [String] = []
+        /// Extras (a backglass, a script, a table's folders) whose table couldn't be told from
+        /// their names, kept in this folder until one is picked.
+        var pendingExtras: URL?
+
+        var isEmpty: Bool {
+            tables.isEmpty && roms.isEmpty && extrasAttachedTo == nil && pendingExtras == nil
+        }
+    }
+
+    /// Files a table can have next to it, besides tables and ROMs.
+    private nonisolated static let extraExtensions: Set<String> = ["directb2s", "vbs", "ini", "res", "pov", "cfg"]
+
+    /// Files that never belong to a ROM, which holds only chip dumps.
+    private nonisolated static let notRomExtensions: Set<String> = extraExtensions.union(["vpx", "vpz", "zip", "vpxz", "png", "jpg", "jpeg", "webp", "mp3", "ogg", "wav", "mp4", "pdf", "txt", "md", "url", "html", "json", "xml", "pal", "vni", "crz", "crom"])
+
+    private func performImport(url: URL, onProgress: ((Int) async -> Void)? = nil) async -> ImportResult? {
         if !TableFileOperations.exists(url) {
             return nil
         }
 
         let ext = url.pathExtension.lowercased()
+        var result = ImportResult()
 
-        if ext == "vpxz" || ext == "zip" {
-            if let destVpxFile = await importArchive(url: url,
-                                                     onProgress: onProgress)
-            {
-                let newTable = createTable(url: destVpxFile)
-                tables.append(newTable)
-                saveTables()
-                return newTable
+        switch ext {
+        case "vpxz", "zip":
+            guard let archiveResult = await importArchive(url: url, onProgress: onProgress) else {
+                return nil
             }
-            return nil
-        } else if ext == "vpx" || ext == "vpz" {
-            if let destFile = await importTableFile(url: url,
-                                                    onProgress: onProgress)
-            {
-                let newTable = createTable(url: destFile)
-                tables.append(newTable)
-                saveTables()
-                return newTable
+            result = archiveResult
+        case "vpx", "vpz":
+            guard let destFile = await importTableFile(url: url, onProgress: onProgress) else {
+                return nil
             }
+            let newTable = createTable(url: destFile)
+            tables.append(newTable)
+            saveTables()
+            result.tables = [newTable]
+        case "directb2s", "vbs":
+            await attachOrHoldExtras(items: [url], label: url.deletingPathExtension().lastPathComponent, result: &result)
+        default:
+            MainViewModel.shared.handleShowError(message: "\"\(url.lastPathComponent)\" isn't a table, a ROM or a table's file")
             return nil
         }
 
-        return nil
+        for table in result.tables {
+            await onProgress?(97)
+            await checkScript(table: table, result: &result)
+        }
+
+        return result
+    }
+
+    /// Fixes the table's script when the community has a fix for it, and keeps the ROM it runs.
+    private func checkScript(table: Table, result: inout ImportResult) async {
+        let outcome = await ScriptPatches.apply(tableURL: table.fullURL)
+        if case let .applied(file) = outcome.result {
+            result.scriptFixes.append(file)
+        }
+        if let script = outcome.script {
+            RomCheck.remember(tablePath: table.path, romNames: RomCheck.romNames(inScript: script))
+        }
     }
 
     private func importTableFile(url: URL, onProgress: ((Int) async -> Void)? = nil) async -> URL? {
@@ -831,7 +879,10 @@ class TableManager {
         return dir
     }
 
-    private func importArchive(url: URL, onProgress: ((Int) async -> Void)? = nil) async -> URL? {
+    /// An archive's tables, each folder holding tables imported as one table folder; its ROMs
+    /// into the shared ROMs folder; and its other files next to the table they belong to. An
+    /// archive holding only a machine's chip dumps is that machine's ROM.
+    private func importArchive(url: URL, onProgress: ((Int) async -> Void)? = nil) async -> ImportResult? {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("vpinball_import_\(Int(Date().timeIntervalSince1970))")
 
@@ -852,47 +903,249 @@ class TableManager {
             }
         }
 
-        let result = await Task.detached {
+        let status = await Task.detached {
             VPinballZipExtract(url.path.cstring, tempDir.path.cstring, zipCallback)
         }.value
         zipProgressHandler = nil
 
-        if VPinballStatus(rawValue: result) != .success {
+        if VPinballStatus(rawValue: status) != .success {
+            MainViewModel.shared.handleShowError(message: "Unable to open the archive")
             return nil
         }
+
+        var result = ImportResult()
+        let files = await Task.detached(priority: .userInitiated) {
+            TableManager.archiveFiles(tempDir)
+        }.value
 
         let tableURLs = await Task.detached(priority: .userInitiated) {
             TableFileOperations.listTableURLs(tempDir)
         }.value
 
-        if tableURLs.count != 1 {
-            MainViewModel.shared.handleShowError(message: tableURLs.isEmpty
-                ? "No tables found in archive"
-                : "Archive contains multiple tables")
+        if tableURLs.isEmpty {
+            // a ROM: the archive holds chip dumps alone, no folders
+            let isRom = url.pathExtension.lowercased() == "zip"
+                && !files.isEmpty
+                && files.allSatisfy { $0.deletingLastPathComponent().standardizedFileURL.path == tempDir.standardizedFileURL.path }
+                && !files.contains { TableManager.notRomExtensions.contains($0.pathExtension.lowercased()) }
+            if isRom {
+                if let name = installRom(url) {
+                    result.roms.append(name)
+                }
+                return result
+            }
+
+            // ROMs, zipped together
+            let nestedZips = files.filter { $0.pathExtension.lowercased() == "zip" }
+            if !nestedZips.isEmpty && nestedZips.count == files.count {
+                result.roms = nestedZips.compactMap { installRom($0) }
+                return result
+            }
+
+            // a table's files without the table
+            let top = topLevelItems(tempDir)
+            if top.isEmpty {
+                MainViewModel.shared.handleShowError(message: "The archive is empty")
+                return nil
+            }
+            await attachOrHoldExtras(items: top, label: url.deletingPathExtension().lastPathComponent, result: &result)
+            return result
+        }
+
+        // each folder holding tables, the outermost first, copied once with all its files
+        let folders = Array(Set(tableURLs.map { $0.deletingLastPathComponent().standardizedFileURL }))
+            .sorted { $0.path.count < $1.path.count }
+        var copiedFolders: [URL] = []
+
+        for folder in folders {
+            if copiedFolders.contains(where: { folder.path.hasPrefix($0.path + "/") }) {
+                continue
+            }
+
+            let folderTables = tableURLs.filter { $0.standardizedFileURL.path.hasPrefix(folder.path + "/") }
+            let first = folderTables.map { $0.deletingPathExtension().lastPathComponent }.sorted().first ?? "table"
+            let destFolder = tablesURL.appendingPathComponent(getUniqueFolder(baseName: first))
+
+            let copied = await Task.detached(priority: .userInitiated) {
+                TableFileOperations.createDirectory(destFolder) && TableFileOperations.copyDirectory(from: folder, to: destFolder)
+            }.value
+            if !copied {
+                _ = TableFileOperations.deleteDirectory(destFolder)
+                continue
+            }
+            copiedFolders.append(folder)
+
+            for tableURL in folderTables {
+                let relative = String(tableURL.standardizedFileURL.path.dropFirst(folder.path.count + 1))
+                let newTable = createTable(url: destFolder.appendingPathComponent(relative))
+                tables.append(newTable)
+                result.tables.append(newTable)
+            }
+        }
+        saveTables()
+
+        if result.tables.isEmpty {
+            MainViewModel.shared.handleShowError(message: "Failed to import table")
             return nil
         }
 
-        let tableURL = tableURLs[0]
-        let tableName = tableURL.deletingPathExtension().lastPathComponent
-        let sourceDir = tableURL.deletingLastPathComponent()
+        // what lies outside the tables' folders: ROMs, and files for the tables
+        let outside = files.filter { file in
+            !copiedFolders.contains { file.standardizedFileURL.path.hasPrefix($0.path + "/") }
+        }
+        for zip in outside where zip.pathExtension.lowercased() == "zip" {
+            if let name = installRom(zip) {
+                result.roms.append(name)
+            }
+        }
+        for extra in outside where TableManager.extraExtensions.contains(extra.pathExtension.lowercased()) {
+            let stem = extra.deletingPathExtension().lastPathComponent
+            if let table = result.tables.count == 1 ? result.tables.first : matchTable(named: stem, in: result.tables) {
+                _ = attachExtras(items: [extra], to: table)
+            }
+        }
 
-        let folderName = getUniqueFolder(baseName: tableName)
-        let destFolder = tablesURL.appendingPathComponent(folderName)
-        let destVpxFile = destFolder.appendingPathComponent(tableURL.lastPathComponent)
+        return result
+    }
 
-        let copied = await Task.detached(priority: .userInitiated) {
-            if !TableFileOperations.createDirectory(destFolder) {
+    /// Every file in an archive, left out the folders macOS adds.
+    private nonisolated static func archiveFiles(_ dir: URL) -> [URL] {
+        var files: [URL] = []
+        if let enumerator = FileManager.default.enumerator(at: dir, includingPropertiesForKeys: [.isDirectoryKey]) {
+            for case let fileURL as URL in enumerator {
+                if fileURL.lastPathComponent == "__MACOSX" {
+                    enumerator.skipDescendants()
+                    continue
+                }
+                if (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory != true,
+                   fileURL.lastPathComponent != ".DS_Store"
+                {
+                    files.append(fileURL)
+                }
+            }
+        }
+        return files
+    }
+
+    /// An archive's contents, past a single folder holding everything.
+    private func topLevelItems(_ dir: URL) -> [URL] {
+        let items = ((try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey])) ?? [])
+            .filter { $0.lastPathComponent != "__MACOSX" && $0.lastPathComponent != ".DS_Store" }
+        if items.count == 1, let only = items.first,
+           (try? only.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true,
+           only.lastPathComponent.lowercased() != "pinmame"
+        {
+            return topLevelItems(only)
+        }
+        return items
+    }
+
+    /// A ROM into the shared ROMs folder, under the name PinMAME looks for; its name, or nil.
+    private func installRom(_ zip: URL) -> String? {
+        let romsURL = RomCheck.sharedRomsURL
+        let fileName = RomCheck.cleanRomFileName(zip.lastPathComponent)
+        if !TableFileOperations.createDirectory(romsURL)
+            || !TableFileOperations.copy(from: zip, to: romsURL.appendingPathComponent(fileName))
+        {
+            VPinballManager.log(.error, "Unable to install the ROM \(fileName)")
+            return nil
+        }
+        VPinballManager.log(.info, "Installed the ROM \(fileName)")
+        return URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+    }
+
+    /// The one table whose file or name matches `name`, ignoring case, spaces and punctuation.
+    private func matchTable(named name: String, in candidates: [Table]? = nil) -> Table? {
+        func key(_ s: String) -> String {
+            s.lowercased().filter { $0.isLetter || $0.isNumber }
+        }
+        let wanted = key(name)
+        if wanted.isEmpty {
+            return nil
+        }
+        let pool = candidates ?? tables
+
+        let exact = pool.filter { key($0.stem) == wanted || key($0.name) == wanted }
+        if exact.count == 1 {
+            return exact.first
+        }
+        if !exact.isEmpty {
+            return nil
+        }
+
+        // "Attack from Mars (Bally 1995) VPW 2.0" for "Attack from Mars (Bally 1995)"
+        if wanted.count >= 6 {
+            let partial = pool.filter {
+                let stem = key($0.stem)
+                return stem.count >= 6 && (stem.hasPrefix(wanted) || wanted.hasPrefix(stem))
+            }
+            if partial.count == 1 {
+                return partial.first
+            }
+        }
+        return nil
+    }
+
+    /// Extras next to the table their name matches, or held until a table is picked.
+    private func attachOrHoldExtras(items: [URL], label: String, result: inout ImportResult) async {
+        let names = [label] + items.map { $0.deletingPathExtension().lastPathComponent }
+        for name in names {
+            if let table = matchTable(named: name) {
+                if attachExtras(items: items, to: table) {
+                    result.extrasAttachedTo = table
+                }
+                return
+            }
+        }
+
+        let pending = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vpinball_pending_\(Int(Date().timeIntervalSince1970))")
+            .appendingPathComponent(label)
+        if !TableFileOperations.createDirectory(pending) {
+            return
+        }
+        for item in items {
+            _ = TableFileOperations.copyMerging(from: item, to: pending.appendingPathComponent(item.lastPathComponent))
+        }
+        result.pendingExtras = pending
+    }
+
+    /// Files and folders put next to a table, merged with what's there. A single backglass or
+    /// script takes the table's name, as VPX looks for it.
+    @discardableResult
+    func attachExtras(items: [URL], to table: Table) -> Bool {
+        let dir = table.baseURL
+        let single = { (ext: String) in items.filter { $0.pathExtension.lowercased() == ext }.count == 1 }
+
+        for item in items {
+            let ext = item.pathExtension.lowercased()
+            var name = item.lastPathComponent
+            if (ext == "directb2s" || ext == "vbs" || ext == "ini") && single(ext) {
+                name = table.stem + "." + ext
+            }
+            if !TableFileOperations.copyMerging(from: item, to: dir.appendingPathComponent(name)) {
+                VPinballManager.log(.error, "Unable to put \(item.lastPathComponent) next to \(table.fileName)")
                 return false
             }
-            if !TableFileOperations.copyDirectory(from: sourceDir,
-                                                  to: destFolder)
-            {
-                return false
+            if ext == "vbs", let script = try? Data(contentsOf: table.scriptURL) {
+                RomCheck.remember(tablePath: table.path, romNames: RomCheck.romNames(inScript: script))
             }
-            return true
-        }.value
+        }
 
-        return copied ? destVpxFile : nil
+        if let index = tables.firstIndex(where: { $0.uuid == table.uuid }) {
+            tables[index] = tables[index].with(modifiedAt: Int64(Date().timeIntervalSince1970))
+            saveTables()
+        }
+        return true
+    }
+
+    /// Extras held by an import put next to the table picked for them.
+    func attachPendingExtras(_ folder: URL, to table: Table) -> Bool {
+        defer {
+            _ = TableFileOperations.deleteDirectory(folder.deletingLastPathComponent())
+        }
+        let items = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        return attachExtras(items: items, to: table)
     }
 
     private func performRename(table: Table, newName: String) -> Bool {
