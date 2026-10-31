@@ -155,6 +155,11 @@ private struct TableLaunchPresentation: ViewModifier {
                 TableLaunchView(table: table)
                     .navigationTransition(.zoom(sourceID: mainViewModel.playSourceID, in: namespace))
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                if vpinballModel.activeTable == nil {
+                    MainViewModel.shared.handleBecameActive()
+                }
+            }
             .onChange(of: vpinballModel.activeTable) { _, table in
                 if let table, !vpinballModel.isPlaying {
                     launchTable = table

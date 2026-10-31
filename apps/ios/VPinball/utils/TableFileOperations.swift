@@ -1,6 +1,9 @@
 import Foundation
 
 enum TableFileOperations {
+    /// The folder in the tables folder whose contents are imported (`TableManager.processImportFolder`).
+    static let importFolderName = "Import"
+
     static func exists(_ url: URL) -> Bool {
         return FileManager.default.fileExists(atPath: url.path)
     }
@@ -60,6 +63,8 @@ enum TableFileOperations {
     static func listTableURLs(_ url: URL) -> [URL] {
         var tables: [URL] = []
         let preferencesURL = URL(fileURLWithPath: VPinballManager.shared.getPath(.preferences)).standardizedFileURL
+        let importURL = URL(fileURLWithPath: VPinballManager.shared.getPath(.tables))
+            .appendingPathComponent(importFolderName).standardizedFileURL
 
         if let enumerator = FileManager.default.enumerator(at: url,
                                                            includingPropertiesForKeys: [.isDirectoryKey],
@@ -70,7 +75,9 @@ enum TableFileOperations {
                 let ext = fileURL.pathExtension.lowercased()
 
                 if isDirectory {
-                    if fileURL.standardizedFileURL == preferencesURL || fileURL.lastPathComponent == "Inbox" {
+                    if fileURL.standardizedFileURL.path == preferencesURL.path || fileURL.standardizedFileURL.path == importURL.path
+                        || fileURL.lastPathComponent == "Inbox"
+                    {
                         enumerator.skipDescendants()
                     } else if ext == "vpz" {
                         tables.append(fileURL)

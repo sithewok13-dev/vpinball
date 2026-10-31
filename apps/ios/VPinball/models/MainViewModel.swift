@@ -139,9 +139,17 @@ class MainViewModel: ObservableObject {
 
         Task {
             await TableManager.shared.refresh()
+            await TableManager.shared.processImportFolder()
         }
 
         handleOpenURL()
+    }
+
+    /// Back in the app, perhaps with files dropped in the Import folder meanwhile.
+    func handleBecameActive() {
+        Task {
+            await TableManager.shared.processImportFolder()
+        }
     }
 
     func handleOpenURL() {
@@ -318,12 +326,21 @@ class MainViewModel: ObservableObject {
             lines.append("Installed the ROM\(result.roms.count > 1 ? "s" : "") \(result.roms.joined(separator: ", ")).")
         }
         if !result.scriptFixes.isEmpty {
-            lines.append("Applied the community's mobile fix to the script.")
+            lines.append(result.scriptFixes.count > 1
+                ? "Applied the community's mobile fix to \(result.scriptFixes.count) scripts."
+                : "Applied the community's mobile fix to the script.")
         }
-        for table in result.tables {
-            let missing = RomCheck.missingRoms(for: table)
-            if !missing.isEmpty {
-                lines.append("\"\(table.name)\" needs the ROM \(missing[0]).zip: import it the same way.")
+        if !result.leftInImport.isEmpty {
+            lines.append("Left in the Import folder (no matching table, or not a table's file): \(result.leftInImport.joined(separator: ", ")).")
+        }
+        let needingRoms = result.tables.compactMap { table in
+            RomCheck.missingRoms(for: table).first.map { (table, $0) }
+        }
+        if needingRoms.count > 3 {
+            lines.append("\(needingRoms.count) tables need ROMs not yet installed: \(needingRoms.map { $0.1 + ".zip" }.joined(separator: ", ")).")
+        } else {
+            for (table, rom) in needingRoms {
+                lines.append("\"\(table.name)\" needs the ROM \(rom).zip: import it the same way.")
             }
         }
 

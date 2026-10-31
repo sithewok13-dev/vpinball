@@ -453,6 +453,9 @@ class TableManager {
         if !TableFileOperations.exists(tablesURL) {
             _ = TableFileOperations.createDirectory(tablesURL)
         }
+        if !TableFileOperations.exists(importFolderURL) {
+            _ = TableFileOperations.createDirectory(importFolderURL)
+        }
     }
 
     func loadTables() async {
@@ -787,13 +790,112 @@ class TableManager {
         /// their names, kept in this folder until one is picked.
         var pendingExtras: URL?
 
+        /// Items of the Import folder left there: their table couldn't be told, or they failed.
+        var leftInImport: [String] = []
+
         var isEmpty: Bool {
             tables.isEmpty && roms.isEmpty && extrasAttachedTo == nil && pendingExtras == nil
         }
+
+        mutating func merge(_ other: ImportResult) {
+            tables += other.tables
+            roms += other.roms
+            scriptFixes += other.scriptFixes
+            extrasAttachedTo = extrasAttachedTo ?? other.extrasAttachedTo
+            leftInImport += other.leftInImport
+        }
+    }
+
+    /// Files and folders dropped here (Files, Finder, the web server) are imported the next time
+    /// the app opens or comes back, then removed.
+    var importFolderURL: URL {
+        tablesURL.appendingPathComponent(TableFileOperations.importFolderName)
+    }
+
+    private var processingImportFolder = false
+
+    /// Imports everything in the Import folder, one item at a time: tables and archives first,
+    /// then backglasses and scripts, so these find tables brought in with them. What's imported
+    /// is removed; what couldn't be placed or failed stays, and the summary says so.
+    func processImportFolder() async {
+        if processingImportFolder || VPinballModel.shared.activeTable != nil {
+            return
+        }
+        let importURL = importFolderURL
+        let items = ((try? FileManager.default.contentsOfDirectory(at: importURL, includingPropertiesForKeys: [.isDirectoryKey])) ?? [])
+            .filter { !$0.lastPathComponent.hasPrefix(".") && $0.lastPathComponent != "__MACOSX" }
+            .sorted { a, b in
+                let extra = { (u: URL) in TableManager.extraExtensions.contains(u.pathExtension.lowercased()) }
+                if extra(a) != extra(b) {
+                    return !extra(a)
+                }
+                return a.lastPathComponent.localizedStandardCompare(b.lastPathComponent) == .orderedAscending
+            }
+        if items.isEmpty {
+            return
+        }
+
+        processingImportFolder = true
+        defer { processingImportFolder = false }
+
+        var total = ImportResult()
+        for (n, item) in items.enumerated() {
+            let name = item.lastPathComponent
+            let isFolder = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+            if !isFolder && !TableManager.importableExtensions.contains(item.pathExtension.lowercased()) {
+                total.leftInImport.append(name)
+                continue
+            }
+            VPinballModel.shared.showHUD(title: "Import folder (\(n + 1) of \(items.count))", status: name)
+            try? await Task.sleep(nanoseconds: 100_000_000)
+
+            let ext = item.pathExtension.lowercased()
+            let isDirectory = (try? item.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+            let result: ImportResult?
+            if isDirectory && ext != "vpz" {
+                result = await importContents(of: item, archive: nil) { progress, status in
+                    await MainActor.run {
+                        VPinballModel.shared.updateHUD(progress: progress, status: status)
+                    }
+                }
+            } else {
+                result = await performImport(url: item) { progress in
+                    await MainActor.run {
+                        VPinballModel.shared.updateHUD(progress: progress, status: progress >= 97 ? "Checking script" : name)
+                    }
+                }
+            }
+
+            guard var result else {
+                total.leftInImport.append(name)
+                continue
+            }
+            if let pending = result.pendingExtras {
+                // left where it is, for its table to be named after it or for Files
+                _ = TableFileOperations.deleteDirectory(pending.deletingLastPathComponent())
+                result.pendingExtras = nil
+                result.leftInImport.append(name)
+            } else {
+                _ = TableFileOperations.delete(item)
+            }
+            total.merge(result)
+        }
+
+        VPinballModel.shared.updateHUD(progress: 100, status: "Import complete")
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        VPinballModel.shared.hideHUD()
+
+        if let table = total.tables.first ?? total.extrasAttachedTo {
+            MainViewModel.shared.scrollToTable = table
+        }
+        MainViewModel.shared.handleShowImportSummary(total)
     }
 
     /// Files a table can have next to it, besides tables and ROMs.
     private nonisolated static let extraExtensions: Set<String> = ["directb2s", "vbs", "ini", "res", "pov", "cfg"]
+
+    /// What can be imported on its own.
+    private nonisolated static let importableExtensions: Set<String> = ["vpx", "vpz", "vpxz", "zip", "directb2s", "vbs"]
 
     /// Files that never belong to a ROM, which holds only chip dumps.
     private nonisolated static let notRomExtensions: Set<String> = extraExtensions.union(["vpx", "vpz", "zip", "vpxz", "png", "jpg", "jpeg", "webp", "mp3", "ogg", "wav", "mp4", "pdf", "txt", "md", "url", "html", "json", "xml", "pal", "vni", "crz", "crom"])
@@ -995,10 +1097,14 @@ class TableManager {
                 return result
             }
 
-            // ROMs, zipped together
-            let nestedZips = files.filter { $0.pathExtension.lowercased() == "zip" }
+            // archives alone (ROMs zipped together, tables' downloads): each imported on its own
+            let nestedZips = files.filter { ["zip", "vpxz"].contains($0.pathExtension.lowercased()) }
             if !nestedZips.isEmpty && nestedZips.count == files.count {
-                result.roms = nestedZips.compactMap { installRom($0) }
+                for zip in nestedZips {
+                    if let nested = await performImport(url: zip) {
+                        result.merge(nested)
+                    }
+                }
                 return result
             }
 
@@ -1056,9 +1162,9 @@ class TableManager {
         let outside = files.filter { file in
             !copiedFolders.contains { file.standardizedFileURL.path.hasPrefix($0.path + "/") }
         }
-        for zip in outside where zip.pathExtension.lowercased() == "zip" {
-            if let name = installRom(zip) {
-                result.roms.append(name)
+        for zip in outside where ["zip", "vpxz"].contains(zip.pathExtension.lowercased()) {
+            if let nested = await performImport(url: zip) {
+                result.merge(nested)
             }
         }
         for extra in outside where TableManager.extraExtensions.contains(extra.pathExtension.lowercased()) {
