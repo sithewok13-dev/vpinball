@@ -98,9 +98,16 @@ struct MainView: View {
         Menu {
             Section("Import From...") {
                 Button {
+                    mainViewModel.importingFolder = false
                     mainViewModel.showImportTable = true
                 } label: {
                     Label("Files", systemImage: "doc")
+                }
+                Button {
+                    mainViewModel.importingFolder = true
+                    mainViewModel.showImportTable = true
+                } label: {
+                    Label("Folder", systemImage: "folder")
                 }
             }
 
@@ -182,7 +189,7 @@ private struct MainSheets: ViewModifier {
                            .ignoresSafeArea()
                    })
             .fileImporter(isPresented: $mainViewModel.showImportTable,
-                          allowedContentTypes: [.vpx, .vpxz, .vpz, .zip, .directb2s, .vbscript])
+                          allowedContentTypes: mainViewModel.importingFolder ? [.folder] : [.vpx, .vpxz, .vpz, .zip, .directb2s, .vbscript])
             { result in
                 if case let .success(url) = result {
                     mainViewModel.importTableURL = url

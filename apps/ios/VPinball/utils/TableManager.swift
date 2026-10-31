@@ -41,6 +41,10 @@ class TableManager {
         let ext = url.pathExtension.lowercased()
         let fileName = url.lastPathComponent.removingPercentEncoding ?? url.lastPathComponent
 
+        if ext != "vpz" && TableManager.isFolder(url) {
+            return await importFolder(from: url, name: fileName)
+        }
+
         VPinballModel.shared.showHUD(
             title: fileName,
             status: "Copying"
@@ -107,6 +111,50 @@ class TableManager {
 
         VPinballModel.shared.hideHUD()
 
+        return report(imported)
+    }
+
+    /// Everything in a folder picked in Files: its tables, ROMs and tables' files, read where
+    /// they are rather than copied first, so a large folder needs no room twice.
+    private func importFolder(from url: URL, name: String) async -> Bool {
+        VPinballModel.shared.showHUD(title: name, status: "Importing folder")
+
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        let isSecurityScoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let imported = await importContents(of: url, archive: nil) { progress, status in
+            await MainActor.run {
+                VPinballModel.shared.updateHUD(progress: progress, status: status)
+            }
+        }
+
+        VPinballModel.shared.updateHUD(progress: 100, status: "Import complete")
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        VPinballModel.shared.hideHUD()
+
+        return report(imported)
+    }
+
+    private nonisolated static func isFolder(_ url: URL) -> Bool {
+        if url.hasDirectoryPath {
+            return true
+        }
+        let isSecurityScoped = url.startAccessingSecurityScopedResource()
+        defer {
+            if isSecurityScoped {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        return (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+    }
+
+    private func report(_ imported: ImportResult?) -> Bool {
         guard let imported else {
             return false
         }
@@ -760,10 +808,8 @@ class TableManager {
 
         switch ext {
         case "vpxz", "zip":
-            guard let archiveResult = await importArchive(url: url, onProgress: onProgress) else {
-                return nil
-            }
-            result = archiveResult
+            // the tables' scripts are checked as part of the archive's import
+            return await importArchive(url: url, onProgress: onProgress)
         case "vpx", "vpz":
             guard let destFile = await importTableFile(url: url, onProgress: onProgress) else {
                 return nil
@@ -913,6 +959,20 @@ class TableManager {
             return nil
         }
 
+        return await importContents(of: tempDir, archive: url) { progress, _ in
+            await onProgress?(progress)
+        }
+    }
+
+    /// The tables, ROMs and tables' files in a folder: an unpacked archive (`archive`), or a
+    /// folder picked in Files. Each folder holding tables is imported as one table folder, ROMs go
+    /// into the shared ROMs folder, other files next to the table they belong to, and every new
+    /// table's script is checked.
+    private func importContents(of dir: URL, archive: URL?, onProgress: ((Int, String) async -> Void)? = nil) async -> ImportResult? {
+        let tempDir = dir
+        let url = archive ?? dir
+        let label = archive == nil ? "Importing folder" : "Importing archive"
+
         var result = ImportResult()
         let files = await Task.detached(priority: .userInitiated) {
             TableManager.archiveFiles(tempDir)
@@ -924,7 +984,7 @@ class TableManager {
 
         if tableURLs.isEmpty {
             // a ROM: the archive holds chip dumps alone, no folders
-            let isRom = url.pathExtension.lowercased() == "zip"
+            let isRom = archive?.pathExtension.lowercased() == "zip"
                 && !files.isEmpty
                 && files.allSatisfy { $0.deletingLastPathComponent().standardizedFileURL.path == tempDir.standardizedFileURL.path }
                 && !files.contains { TableManager.notRomExtensions.contains($0.pathExtension.lowercased()) }
@@ -945,7 +1005,7 @@ class TableManager {
             // a table's files without the table
             let top = topLevelItems(tempDir)
             if top.isEmpty {
-                MainViewModel.shared.handleShowError(message: "The archive is empty")
+                MainViewModel.shared.handleShowError(message: archive == nil ? "No tables, ROMs or table files in the folder" : "The archive is empty")
                 return nil
             }
             await attachOrHoldExtras(items: top, label: url.deletingPathExtension().lastPathComponent, result: &result)
@@ -957,9 +1017,12 @@ class TableManager {
             .sorted { $0.path.count < $1.path.count }
         var copiedFolders: [URL] = []
 
-        for folder in folders {
+        for (n, folder) in folders.enumerated() {
             if copiedFolders.contains(where: { folder.path.hasPrefix($0.path + "/") }) {
                 continue
+            }
+            if archive == nil {
+                await onProgress?(10 + n * 80 / max(folders.count, 1), "\(label) (\(n + 1) of \(folders.count))")
             }
 
             let folderTables = tableURLs.filter { $0.standardizedFileURL.path.hasPrefix(folder.path + "/") }
@@ -1003,6 +1066,11 @@ class TableManager {
             if let table = result.tables.count == 1 ? result.tables.first : matchTable(named: stem, in: result.tables) {
                 _ = attachExtras(items: [extra], to: table)
             }
+        }
+
+        for (n, table) in result.tables.enumerated() {
+            await onProgress?(97, result.tables.count > 1 ? "Checking scripts (\(n + 1) of \(result.tables.count))" : "Checking script")
+            await checkScript(table: table, result: &result)
         }
 
         return result

@@ -32,6 +32,8 @@ class MainViewModel: ObservableObject {
     }
 
     @Published var showImportTable = false
+    /// The importer picks a folder of tables, ROMs and tables' files rather than files.
+    @Published var importingFolder = false
 
     @Published var tableListSearchText = ""
     @Published var tableListSearchPresented = false
