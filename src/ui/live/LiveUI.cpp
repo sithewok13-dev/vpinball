@@ -582,6 +582,11 @@ void LiveUI::RenderUI()
    NewFrame();
 }
 
+void LiveUI::ShowTouchHint(uint32_t lengthMs)
+{
+   m_touchHintUntil = msec() + lengthMs;
+}
+
 void LiveUI::UpdateTouchUI()
 {
    if (!m_player->m_pininput.HasTouchInput())
@@ -590,7 +595,10 @@ void LiveUI::UpdateTouchUI()
    if (m_player->m_vrDevice)
       return;
 
-   if (!m_showTouchOverlay)
+   // the hint fades out over its last second
+   const uint32_t now = msec();
+   const float hint = now >= m_touchHintUntil ? 0.f : min(1.f, (float)(m_touchHintUntil - now) / 1000.f);
+   if (!m_showTouchOverlay && hint <= 0.f)
       return;
 
    const ImGuiIO &io = ImGui::GetIO();
@@ -615,11 +623,21 @@ void LiveUI::UpdateTouchUI()
       const ImVec2 topLeft((float)rect.left * screenWidth / 100.0f, (float)rect.top * screenHeight / 100.0f);
       const ImVec2 bottomRight((float)rect.right * screenWidth / 100.0f, (float)rect.bottom * screenHeight / 100.0f);
 
-      constexpr ImColor fillColor(255, 255, 255, 5);
+      // faint when always shown, clear while hinting
+      const float strength = max(m_showTouchOverlay ? 0.15f : 0.f, hint);
+      const ImColor fillColor(255, 255, 255, (int)(5.f + 35.f * strength));
       drawList->AddRectFilled(topLeft, bottomRight, fillColor);
 
-      constexpr ImColor borderColor(255, 255, 255, 20);
+      const ImColor borderColor(255, 255, 255, (int)(20.f + 140.f * strength));
       drawList->AddRect(topLeft, bottomRight, borderColor, 0.0f, ImDrawFlags_RoundAll, 2.0f);
+
+      if (!region.label.empty())
+      {
+         const ImVec2 size = ImGui::CalcTextSize(region.label.c_str());
+         const ImVec2 pos((topLeft.x + bottomRight.x - size.x) * 0.5f, (topLeft.y + bottomRight.y - size.y) * 0.5f);
+         drawList->AddText(ImVec2(pos.x + 1.f, pos.y + 1.f), ImColor(0, 0, 0, (int)(255.f * strength)), region.label.c_str());
+         drawList->AddText(pos, ImColor(255, 255, 255, (int)(255.f * strength)), region.label.c_str());
+      }
    }
    ImGui::End();
    ImGui::PopStyleVar(2);

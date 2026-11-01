@@ -124,6 +124,7 @@ public:
       RECT region;
       unsigned int actionId;
       int directStateSlot;
+      string label; // shown on the touch overlay, empty for regions sharing another's area
    };
    bool HasTouchInput() const { return m_supportsTouch; }
    const vector<TouchRegionDef>& GetTouchState() const { return m_touchRegionMap; }
@@ -281,6 +282,15 @@ private:
 
    bool m_supportsTouch;
    vector<TouchRegionDef> m_touchRegionMap;
+
+   // The touch Start region inserts a coin, then presses Start a moment later, so a single tap
+   // starts a game on machines without credits (most tables) as well as on those with
+   void UpdateTouchStart();
+   enum class TouchStartState { Idle, Waiting, Pressed };
+   TouchStartState m_touchStartState = TouchStartState::Idle;
+   bool m_touchStartFingerDown = false;
+   uint32_t m_touchStartAt = 0;
+   int m_touchCoinSlot = -1;
 
    vector<std::unique_ptr<InputHandler>> m_inputHandlers;
    class SDLInputHandler* m_sdlHandler = nullptr;

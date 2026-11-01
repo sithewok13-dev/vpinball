@@ -53,21 +53,23 @@ InputManager::InputManager(Player* player, Settings& appSettings)
    }
    if (touchDevices)
       SDL_free(touchDevices);
-   auto addTouchRegion = [this](const RECT& region, unsigned int actionId) { m_touchRegionMap.emplace_back(region, actionId, m_inputActions[actionId]->NewDirectStateSlot()); };
+   auto addTouchRegion = [this](const RECT& region, unsigned int actionId, const string& label)
+   { m_touchRegionMap.emplace_back(region, actionId, m_inputActions[actionId]->NewDirectStateSlot(), label); };
    // RECT definition is left, top, right, bottom in % of screen
-   addTouchRegion(RECT { 0, 0, 50, 10 }, GetAddCreditActionId(0));
-   addTouchRegion(RECT { 50, 0, 100, 10 }, GetOpenInGameUIActionId());
-   addTouchRegion(RECT { 0, 10, 50, 30 }, GetLeftMagnaActionId());
-   addTouchRegion(RECT { 50, 10, 100, 30 }, GetRightMagnaActionId());
-   addTouchRegion(RECT { 0, 30, 50, 60 }, GetLeftNudgeActionId());
-   addTouchRegion(RECT { 50, 30, 100, 60 }, GetRightNudgeActionId());
-   addTouchRegion(RECT { 0, 60, 30, 90 }, GetLeftFlipperActionId());
-   addTouchRegion(RECT { 0, 60, 30, 90 }, GetStagedLeftFlipperActionId());
-   addTouchRegion(RECT { 30, 60, 70, 100 }, GetCenterNudgeActionId());
-   addTouchRegion(RECT { 70, 60, 100, 90 }, GetRightFlipperActionId());
-   addTouchRegion(RECT { 70, 60, 100, 90 }, GetStagedRightFlipperActionId());
-   addTouchRegion(RECT { 0, 90, 30, 100 }, GetStartActionId());
-   addTouchRegion(RECT { 70, 90, 100, 100 }, GetLaunchBallActionId());
+   addTouchRegion(RECT { 0, 0, 50, 10 }, GetAddCreditActionId(0), "COIN"s);
+   addTouchRegion(RECT { 50, 0, 100, 10 }, GetOpenInGameUIActionId(), "MENU"s);
+   addTouchRegion(RECT { 0, 10, 50, 30 }, GetLeftMagnaActionId(), "MAGNA"s);
+   addTouchRegion(RECT { 50, 10, 100, 30 }, GetRightMagnaActionId(), "MAGNA"s);
+   addTouchRegion(RECT { 0, 30, 50, 60 }, GetLeftNudgeActionId(), "NUDGE"s);
+   addTouchRegion(RECT { 50, 30, 100, 60 }, GetRightNudgeActionId(), "NUDGE"s);
+   addTouchRegion(RECT { 0, 60, 30, 90 }, GetLeftFlipperActionId(), "FLIPPER"s);
+   addTouchRegion(RECT { 0, 60, 30, 90 }, GetStagedLeftFlipperActionId(), ""s);
+   addTouchRegion(RECT { 30, 60, 70, 100 }, GetCenterNudgeActionId(), "NUDGE"s);
+   addTouchRegion(RECT { 70, 60, 100, 90 }, GetRightFlipperActionId(), "FLIPPER"s);
+   addTouchRegion(RECT { 70, 60, 100, 90 }, GetStagedRightFlipperActionId(), ""s);
+   addTouchRegion(RECT { 0, 90, 30, 100 }, GetStartActionId(), "START"s);
+   addTouchRegion(RECT { 70, 90, 100, 100 }, GetLaunchBallActionId(), "LAUNCH"s);
+   m_touchCoinSlot = m_inputActions[GetAddCreditActionId(0)]->NewDirectStateSlot();
 
    m_rumbleMode = m_appSettings.GetPlayer_RumbleMode();
    m_rumbleFlipperContact = m_appSettings.GetPlayer_RumbleFlipperContact();
@@ -423,6 +425,7 @@ void InputManager::ProcessInput()
       handler->Update();
 
    UpdateRumble();
+   UpdateTouchStart();
 
    // Handle automatic start
    if (m_player->m_ptable->m_tblAutoStartEnabled)
@@ -639,6 +642,35 @@ void InputManager::PushAxisEvent(uint16_t deviceId, uint16_t axisId, uint64_t ti
    }
 }
 
+void InputManager::UpdateTouchStart()
+{
+   if (m_touchStartState == TouchStartState::Idle)
+      return;
+   const uint32_t now = msec();
+   if (now < m_touchStartAt)
+      return;
+   const TouchRegionDef* start = nullptr;
+   for (const auto& region : m_touchRegionMap)
+      if (region.actionId == GetStartActionId())
+         start = &region;
+   if (start == nullptr)
+   {
+      m_touchStartState = TouchStartState::Idle;
+      return;
+   }
+   if (m_touchStartState == TouchStartState::Waiting)
+   {
+      m_inputActions[start->actionId]->SetDirectState(start->directStateSlot, true);
+      m_touchStartState = TouchStartState::Pressed;
+      m_touchStartAt = now + 100; // held at least this long, as a finger would
+   }
+   else if (!m_touchStartFingerDown)
+   {
+      m_inputActions[start->actionId]->SetDirectState(start->directStateSlot, false);
+      m_touchStartState = TouchStartState::Idle;
+   }
+}
+
 void InputManager::PushTouchEvent(float relativeX, float relativeY, uint64_t timestampNs, bool isPressed)
 {
    // Discard input events until the player has been running for a few frames to avoid triggering actions during table startup
@@ -654,6 +686,22 @@ void InputManager::PushTouchEvent(float relativeX, float relativeY, uint64_t tim
    point.y = (int)((float)m_player->m_playfieldWnd->GetHeight() * relativeY);
    for (const auto& region : m_touchRegionMap)
    {
+      if (region.actionId == GetStartActionId())
+      {
+         // Coin now, Start a moment later (UpdateTouchStart), released once the finger lifts
+         if (m_touchStartFingerDown == isPressed
+            || !Intersect(region.region, m_player->m_playfieldWnd->GetWidth(), m_player->m_playfieldWnd->GetHeight(), point,
+               fmodf(m_player->m_ptable->GetViewSetup().mViewportRotation, 360.0f) != 0.f))
+            continue;
+         m_touchStartFingerDown = isPressed;
+         m_inputActions[GetAddCreditActionId(0)]->SetDirectState(m_touchCoinSlot, isPressed);
+         if (isPressed && m_touchStartState == TouchStartState::Idle)
+         {
+            m_touchStartState = TouchStartState::Waiting;
+            m_touchStartAt = msec() + 250;
+         }
+         continue;
+      }
       if (const bool wasPressed = m_inputActions[region.actionId]->GetDirectState(region.directStateSlot); wasPressed == isPressed)
          continue;
       if (!Intersect(region.region, m_player->m_playfieldWnd->GetWidth(), m_player->m_playfieldWnd->GetHeight(), point,

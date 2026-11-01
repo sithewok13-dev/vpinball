@@ -46,6 +46,8 @@ public:
    bool IsShowingFPSDetails() const { return m_perfUI.GetPerfMode() != PerfUI::PerfMode::PM_DISABLED; }
    
    void ShowTouchOverlay(bool show) { m_showTouchOverlay = show; }
+   // Shows the touch regions, labelled, for a while (when a table starts, for players new to them)
+   void ShowTouchHint(uint32_t lengthMs);
 
    unsigned int PushNotification(const string &message, const int lengthMs, const unsigned int reuseId = 0) { return m_notificationOverlay.PushNotification(message, lengthMs, reuseId); }
 
@@ -90,6 +92,7 @@ private:
    // Touch UI overlay
    void UpdateTouchUI();
    bool m_showTouchOverlay;
+   uint32_t m_touchHintUntil = 0;
 
    // Emulated plumb overlay
    PlumbOverlay m_plumbOverlay;
