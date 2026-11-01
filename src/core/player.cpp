@@ -1674,23 +1674,30 @@ void Player::PlaceScoreViewAboveTable()
    if (width >= height)
       return; // a landscape screen leaves no room above the table
 
-   // Where the playfield's top edge lands on screen (as LiveRenderContext::Project)
+   // Where the table's top lands on screen (as LiveRenderContext::Project), at the glass' height:
+   // ramps and toys at the back stand above the playfield and, seen from the player, reach higher
+   // up the screen than the playfield's own edge, but never above the glass
    const Matrix3D mvp = m_renderer->GetMVP().GetModelViewProj(0);
+   const float z = m_ptable->GetViewSetup().GetWindowTopZOffset();
    float top = (float)height;
    for (const float x : { m_ptable->m_left, (m_ptable->m_left + m_ptable->m_right) * 0.5f, m_ptable->m_right })
    {
       const float y = m_ptable->m_top;
-      const float yp = mvp._12 * x + mvp._22 * y + mvp._42;
-      const float wp = mvp._14 * x + mvp._24 * y + mvp._44;
+      const float yp = mvp._12 * x + mvp._22 * y + mvp._32 * z + mvp._42;
+      const float wp = mvp._14 * x + mvp._24 * y + mvp._34 * z + mvp._44;
       if (wp > 1e-10f)
          top = min(top, (wp - yp) * 0.5f * (float)height / wp);
    }
 
-   // only when there's real room: a strip of at least 6% of the screen, ending a little above the
-   // playfield's top edge (the projected edge sits a bit lower than the playfield's visible top)
-   const int room = (int)top - height * 3 / 100;
+   // only when there's real room, a strip of at least 6% of the screen; else no score display
+   // rather than one over the table (its size from the settings may cover all of it)
+   const int room = (int)top - height / 100;
    if (room < height * 6 / 100)
+   {
+      m_scoreViewOutput.SetMode(m_ptable->GetSettings(), VPX::RenderOutput::OM_DISABLED);
+      PLOGI << "No room above the table for the score display";
       return;
+   }
    VPX::EmbeddedWindow* const scoreView = m_scoreViewOutput.GetEmbeddedWindow();
    scoreView->SetPos(0, 0);
    scoreView->SetSize(width, room);
