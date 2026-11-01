@@ -1686,8 +1686,9 @@ void Player::PlaceScoreViewAboveTable()
          top = min(top, (wp - yp) * 0.5f * (float)height / wp);
    }
 
-   // only when there's real room: a strip of at least 6% of the screen
-   const int room = (int)top - height / 100;
+   // only when there's real room: a strip of at least 6% of the screen, ending a little above the
+   // playfield's top edge (the projected edge sits a bit lower than the playfield's visible top)
+   const int room = (int)top - height * 3 / 100;
    if (room < height * 6 / 100)
       return;
    VPX::EmbeddedWindow* const scoreView = m_scoreViewOutput.GetEmbeddedWindow();
