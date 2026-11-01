@@ -723,6 +723,11 @@ bool LiveUI::OnTouch(uint64_t finger, float x, float y, int phase)
                spot.x = snap.x + (snap.z - spot.z) * 0.5f;
                spot.y = snap.y + (snap.w - spot.w) * 0.5f;
             }
+         // and to the screen's middle, across and down (shown by a guide line, see UpdateScoreViewEditor)
+         if (fabsf(spot.x + spot.z * 0.5f - 0.5f) < 0.02f)
+            spot.x = 0.5f - spot.z * 0.5f;
+         if (fabsf(spot.y + spot.w * 0.5f - 0.5f) < 0.012f)
+            spot.y = 0.5f - spot.w * 0.5f;
       }
       else
          return true;
@@ -793,6 +798,15 @@ void LiveUI::UpdateScoreViewEditor()
       }
       // Its outline, and the transparency slider with its value
       const vec4 spot = m_player->GetScoreViewSpot();
+      // Guide lines while it's centered across (a line down the middle) or down the screen (a line across)
+      if (m_dragFinger != NoFinger)
+      {
+         const ImU32 guide = IM_COL32(255, 210, 0, 220);
+         if (fabsf(spot.x + spot.z * 0.5f - 0.5f) < 0.002f)
+            drawList->AddLine(ImVec2(size.x * 0.5f, 0.f), ImVec2(size.x * 0.5f, size.y), guide, 1.5f * dpi);
+         if (fabsf(spot.y + spot.w * 0.5f - 0.5f) < 0.002f)
+            drawList->AddLine(ImVec2(0.f, size.y * 0.5f), ImVec2(size.x, size.y * 0.5f), guide, 1.5f * dpi);
+      }
       const ImVec2 a = toScreen(spot.x, spot.y), b = toScreen(spot.x + spot.z, spot.y + spot.w);
       drawList->AddRect(a, b, IM_COL32(255, 255, 255, 230), 6.f * dpi, ImDrawFlags_None, 2.5f * dpi);
       for (const ImVec2& corner : { a, b, ImVec2(a.x, b.y), ImVec2(b.x, a.y) })

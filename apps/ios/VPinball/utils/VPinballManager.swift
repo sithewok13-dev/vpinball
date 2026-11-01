@@ -143,7 +143,12 @@ class VPinballManager {
             saveValue(.scoreView, "ScoreViewOpacity", Float(0.6))
         }
 
-        saveValue(.standalone, "PhoneViewDefaults", 3)
+        if applied < 4 {
+            // At the top (its new place), digits a little dimmer: 80% transparent
+            saveValue(.scoreView, "ScoreViewOpacity", Float(0.2))
+        }
+
+        saveValue(.standalone, "PhoneViewDefaults", 4)
     }
 
     private static func runOnMain(_ body: @escaping @MainActor () -> Void) {

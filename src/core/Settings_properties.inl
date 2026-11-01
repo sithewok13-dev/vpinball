@@ -59,7 +59,7 @@ PropEnumDyn(Backglass, BackglassRotation, "Rotation"s, "Rotate the rendered cont
 // ScoreView Window
 PropEnumDyn(ScoreView, ScoreViewOutput, "Output Mode"s, "Select between disabled, floating, or embedded in another window mode"s, int /* OutputMode */, 0 /* OM_DISABLED */, "Disabled"s,
    "Floating"s, "Embedded in playfield"s);
-PropBool(ScoreView, ScoreViewAboveTable, "Automatic Placement"s, "When the table is fitted to a portrait screen automatically, place the score display (embedded in the playfield) in the room above the table, else on its apron, unless it was placed by hand (touch and hold it)"s, false);
+PropBool(ScoreView, ScoreViewAboveTable, "Automatic Placement"s, "On a portrait screen, place the score display (embedded in the playfield) at the top, in the room above the table when it's fitted to the screen and leaves enough, unless it was placed by hand (touch and hold it)"s, false);
 PropFloat(ScoreView, ScoreViewRelX, "Placed X"s, "Left of the score display placed by hand, relative to the playfield window's width (-1 for automatic placement)"s, -1.f, 1.f, -1.f);
 PropFloat(ScoreView, ScoreViewRelY, "Placed Y"s, "Top of the score display placed by hand, relative to the playfield window's height"s, -1.f, 1.f, -1.f);
 PropFloat(ScoreView, ScoreViewRelW, "Placed Width"s, "Width of the score display placed by hand, relative to the playfield window's width"s, -1.f, 1.f, -1.f);

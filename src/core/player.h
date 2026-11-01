@@ -298,7 +298,7 @@ public:
    // Its place relative to the playfield window (x, y, width, height)
    void SetScoreViewSpot(const vec4& spot);
    vec4 GetScoreViewSpot() const;
-   // Where it goes automatically, also where it snaps to when moved by hand (no room above the table: width 0)
+   // Where it goes automatically (the top), and where it snaps to when moved by hand (the top, the apron)
    vec4 m_scoreViewTopSpot = vec4(0.f, 0.f, 0.f, 0.f);
    vec4 m_scoreViewApronSpot = vec4(0.f, 0.f, 0.f, 0.f);
 

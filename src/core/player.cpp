@@ -1676,10 +1676,21 @@ void Player::PlaceScoreViewAboveTable()
       return; // portrait screens only
 
    // The 2 spots it goes to (relative to the window: x, y, width, height), also those it snaps to when moved
-   // by hand: the room above the table if there's some, and the middle of the apron, between the START and
-   // LAUNCH touch regions (30% of the width each side), a display's usual 4:1 shape
+   // by hand, in a display's usual 4:1 shape: at the top, 80% of the screen's width, in the room above the
+   // table if there's enough, else over the table just below what the system keeps (a notch, a Dynamic
+   // Island, its safe area); and in the middle of the apron, between the START and LAUNCH touch regions
    const float aspect = (float)width / (float)height;
    m_scoreViewApronSpot = vec4(0.30f, 0.995f - 0.40f * aspect / 4.f, 0.40f, 0.40f * aspect / 4.f);
+   float safeTop = 0.f;
+   if (SDL_Rect safe; SDL_GetWindowSafeArea(m_playfieldWnd->GetCore(), &safe))
+   {
+      int wndW, wndH;
+      SDL_GetWindowSize(m_playfieldWnd->GetCore(), &wndW, &wndH);
+      if (wndH > 0)
+         safeTop = (float)safe.y / (float)wndH;
+   }
+   const float topW = 0.80f, topH = topW * aspect / 4.f;
+   m_scoreViewTopSpot = vec4((1.f - topW) * 0.5f, safeTop + 0.005f, topW, topH);
    if (m_cabinetAutoFitMode != 0 && m_ptable->GetViewMode() == ViewSetupID::BG_FULLSCREEN)
    {
       // Where the table's top lands on screen (as LiveRenderContext::Project), at the glass' height:
@@ -1697,16 +1708,16 @@ void Player::PlaceScoreViewAboveTable()
          if (wp > 1e-10f)
             top = min(top, (wp - yp) * 0.5f / wp);
       }
-      // only when there's real room: a strip of at least 6% of the screen
-      if (const float room = top - 0.01f; room >= 0.06f)
-         m_scoreViewTopSpot = vec4(0.f, 0.f, 1.f, room);
+      // in the middle of the room above the table when it holds the display (under the safe area)
+      if (const float room = top - 0.01f - safeTop; room >= topH)
+         m_scoreViewTopSpot.y = safeTop + (room - topH) * 0.5f;
    }
 
-   // Placed by hand (touch and hold it), else above the table if there's room, else on the apron
+   // Placed by hand (touch and hold it), else at the top
    const Settings& settings = m_ptable->GetSettings();
    vec4 spot(settings.GetScoreView_ScoreViewRelX(), settings.GetScoreView_ScoreViewRelY(), settings.GetScoreView_ScoreViewRelW(), settings.GetScoreView_ScoreViewRelH());
    if (spot.z <= 0.f || spot.w <= 0.f)
-      spot = m_scoreViewTopSpot.z > 0.f ? m_scoreViewTopSpot : m_scoreViewApronSpot;
+      spot = m_scoreViewTopSpot;
    SetScoreViewSpot(spot);
 }
 
