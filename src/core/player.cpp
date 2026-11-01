@@ -1678,7 +1678,8 @@ void Player::PlaceScoreViewAboveTable()
    // ramps and toys at the back stand above the playfield and, seen from the player, reach higher
    // up the screen than the playfield's own edge, but never above the glass
    const Matrix3D mvp = m_renderer->GetMVP().GetModelViewProj(0);
-   const float z = m_ptable->GetViewSetup().GetWindowTopZOffset();
+   const ViewSetup& viewSetup = m_ptable->GetViewSetup();
+   const float z = viewSetup.mMode == VLM_WINDOW ? viewSetup.mWindowTopZOfs : 0.f;
    float top = (float)height;
    for (const float x : { m_ptable->m_left, (m_ptable->m_left + m_ptable->m_right) * 0.5f, m_ptable->m_right })
    {
