@@ -102,27 +102,42 @@ class VPinballManager {
         applyPhoneViewDefaults()
     }
 
-    /// On a phone, tables are seen head on, filling the screen: VPX's cabinet view, fitted to the
-    /// screen automatically, rather than each table's desktop view, which is made for a wide
-    /// monitor. Applied once, so a view chosen in the in-game menu afterwards is kept.
+    /// Settings that make tables play well on a phone, each step applied once (by its version in
+    /// `Standalone.PhoneViewDefaults`), so a choice made later in the in-game menu is kept.
     private func applyPhoneViewDefaults() {
-        guard UIDevice.current.userInterfaceIdiom == .phone,
-              loadValue(.standalone, "PhoneViewDefaults", 0) < 1
-        else {
+        guard UIDevice.current.userInterfaceIdiom == .phone else {
             return
         }
+        let applied = loadValue(.standalone, "PhoneViewDefaults", 0)
 
-        // the screen's size in cm, long side as width as VPX takes it: points are about 1/160 inch
-        let bounds = UIScreen.main.bounds
-        let longSide = Float(max(bounds.width, bounds.height)) / 160 * 2.54
-        let shortSide = Float(min(bounds.width, bounds.height)) / 160 * 2.54
+        if applied < 1 {
+            // Tables seen head on, filling the screen: VPX's cabinet view fitted to the screen
+            // automatically, rather than each table's desktop view made for a wide monitor. The
+            // screen's size in cm, long side as width as VPX takes it: points are about 1/160 inch.
+            let bounds = UIScreen.main.bounds
+            let longSide = Float(max(bounds.width, bounds.height)) / 160 * 2.54
+            let shortSide = Float(min(bounds.width, bounds.height)) / 160 * 2.54
+            saveValue(.player, "BGSet", 1) // cabinet
+            saveValue(.player, "CabinetAutofitMode", 1) // fitted on the table's width, without stretching
+            saveValue(.player, "ScreenWidth", longSide)
+            saveValue(.player, "ScreenHeight", shortSide)
+            saveValue(.player, "ScreenPlayerZ", Float(40)) // a phone held at arm's length: cm above the glass
+        }
 
-        saveValue(.player, "BGSet", 1) // cabinet
-        saveValue(.player, "CabinetAutofitMode", 1) // fitted on the table's width, without stretching
-        saveValue(.player, "ScreenWidth", longSide)
-        saveValue(.player, "ScreenHeight", shortSide)
-        saveValue(.player, "ScreenPlayerZ", Float(40)) // a phone held at arm's length: cm above the glass
-        saveValue(.standalone, "PhoneViewDefaults", 1)
+        if applied < 2 {
+            // No vibration
+            saveValue(.player, "RumbleMode", 0)
+            // A game started on its own once the table is ready: a coin, then Start, from 4 s after
+            // loading, tried again every 6 s until a ball moves (3 tries at most)
+            saveValue(.player, "asenable", true)
+            saveValue(.player, "Autostart", 400)
+            saveValue(.player, "AutostartRetry", 600)
+            // The score display in the room left above the table
+            saveValue(.scoreView, "ScoreViewOutput", 2) // embedded in the playfield
+            saveValue(.scoreView, "ScoreViewAboveTable", true)
+        }
+
+        saveValue(.standalone, "PhoneViewDefaults", 2)
     }
 
     private static func runOnMain(_ body: @escaping @MainActor () -> Void) {

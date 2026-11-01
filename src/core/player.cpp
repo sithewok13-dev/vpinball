@@ -397,7 +397,7 @@ Player::Player(PinTable *const table, const PlayMode playMode, LoadProgress &loa
       g_settingsService.GetAppSettings().SetPlayer_NumberOfTimesToShowTouchMessage(max(numberOfTimesToShowTouchMessage - 1, 0), false);
       // the regions themselves, labelled, rather than a description of them
       m_liveUI->ShowTouchHint(8000);
-      m_liveUI->PushNotification("Tap START to play"s, 4000);
+      m_liveUI->PushNotification(m_ptable->m_tblAutoStartEnabled ? "The game starts by itself: hold LAUNCH to shoot the ball"s : "Tap START to play"s, 5000);
    }
 
    SetPlayState(true);
@@ -977,6 +977,7 @@ void Player::InitTableSession(const bool isInitial)
    SetCabinetAutoFitMode(m_ptable->GetSettings().GetPlayer_CabinetAutofitMode());
    SetCabinetAutoFitPos(m_ptable->GetSettings().GetPlayer_CabinetAutofitPos());
    m_renderer->InitLayout();
+   PlaceScoreViewAboveTable();
 
    // Initialize stereo rendering
    m_renderer->UpdateStereoShaderState();
@@ -1661,6 +1662,38 @@ void Player::SetCabinetAutoFitMode(int mode)
       Vertex3Ds playerPos(m_ptable->GetSettings().GetPlayer_ScreenPlayerX(), m_ptable->GetSettings().GetPlayer_ScreenPlayerY(), m_ptable->GetSettings().GetPlayer_ScreenPlayerZ());
       m_ptable->GetViewSetup().SetWindowAutofit(m_ptable, playerPos, m_renderer->GetDisplayAspectRatio(), m_cabinetAutoFitPos, m_cabinetAutoFitMode == 2, [](string) { });
    }
+}
+
+void Player::PlaceScoreViewAboveTable()
+{
+   if (!m_ptable->GetSettings().GetScoreView_ScoreViewAboveTable() || m_scoreViewOutput.GetMode() != VPX::RenderOutput::OM_EMBEDDED || m_cabinetAutoFitMode == 0
+      || m_ptable->GetViewMode() != ViewSetupID::BG_FULLSCREEN)
+      return;
+   const int width = m_playfieldWnd->GetWidth();
+   const int height = m_playfieldWnd->GetHeight();
+   if (width >= height)
+      return; // a landscape screen leaves no room above the table
+
+   // Where the playfield's top edge lands on screen (as LiveRenderContext::Project)
+   const Matrix3D mvp = m_renderer->GetMVP().GetModelViewProj(0);
+   float top = (float)height;
+   for (const float x : { m_ptable->m_left, (m_ptable->m_left + m_ptable->m_right) * 0.5f, m_ptable->m_right })
+   {
+      const float y = m_ptable->m_top;
+      const float yp = mvp._12 * x + mvp._22 * y + mvp._42;
+      const float wp = mvp._14 * x + mvp._24 * y + mvp._44;
+      if (wp > 1e-10f)
+         top = min(top, (wp - yp) * 0.5f * (float)height / wp);
+   }
+
+   // only when there's real room: a strip of at least 6% of the screen
+   const int room = (int)top - height / 100;
+   if (room < height * 6 / 100)
+      return;
+   VPX::EmbeddedWindow* const scoreView = m_scoreViewOutput.GetEmbeddedWindow();
+   scoreView->SetPos(0, 0);
+   scoreView->SetSize(width, room);
+   PLOGI << "Score display placed above the table: " << width << "x" << room;
 }
 
 void Player::SetCabinetAutoFitPos(float pos)

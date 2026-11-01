@@ -9,6 +9,7 @@
 #include "core/VPXPluginAPIImpl.h"
 #include "input/PlungerHandler.h"
 #include "math/bbox.h"
+#include "parts/ball.h"
 #include "physics/cabinet/NudgeHandler.h"
 #include "renderer/VRDevice.h"
 #include "ui/live/LiveUI.h"
@@ -1422,7 +1423,20 @@ void InputManager::Autostart(const uint32_t initialDelayMs, const uint32_t retry
    // while lots of tables do create balls on startup instead.
    if (m_gameStartedOnce)
       return;
-   if (!m_player->m_vball.empty())
+   if (m_supportsTouch)
+   {
+      // Many tables create their balls at startup (in the trough), so a ball existing doesn't
+      // say a game started; a ball moving does: the machine kicks one to the plunger lane
+      for (const Ball* ball : m_player->m_vball)
+         if (ball->GetVelocity().LengthSquared() > 0.25f)
+         {
+            m_gameStartedOnce = true;
+            return;
+         }
+      if (m_autoStartAttempts >= 3 && !m_autoStartPressed && !m_autoStartCoinPressed)
+         return;
+   }
+   else if (!m_player->m_vball.empty())
    {
       m_gameStartedOnce = true;
       return;
@@ -1446,14 +1460,35 @@ void InputManager::Autostart(const uint32_t initialDelayMs, const uint32_t retry
          m_inputActions[m_startActionId]->SetDirectState(m_autoStartDirectStateSlot, false);
       PLOGD << "Autostart: Release";
    }
-   else if (!m_autoStartPressed                                       // Start button is up.
+   else if (m_autoStartCoinPressed && (elapsed > 150)) // Coin in: release it and press start
+   {
+      m_autoStartTimestamp = now;
+      m_autoStartCoinPressed = false;
+      m_inputActions[GetAddCreditActionId(0)]->SetDirectState(m_autoStartCoinSlot, false);
+      m_autoStartPressed = true;
+      if (m_autoStartDirectStateSlot == -1)
+         m_autoStartDirectStateSlot = m_inputActions[m_startActionId]->NewDirectStateSlot();
+      m_inputActions[m_startActionId]->SetDirectState(m_autoStartDirectStateSlot, true);
+      PLOGD << "Autostart: Press (after coin)";
+   }
+   else if (!m_autoStartPressed && !m_autoStartCoinPressed             // Start button is up.
        && (    ( m_autoStartDoneOnce && (elapsed > retryDelayMs))     // Not started and last attempt was at least AutoStartRetry seconds ago.
             || (!m_autoStartDoneOnce && (elapsed > initialDelayMs)))) // Never attempted and autostart time has elapsed.
    {
-      // Press start.
+      // Press start (on touch screens, insert a coin first)
       m_autoStartTimestamp = now;
-      m_autoStartPressed = true;
       m_autoStartDoneOnce = true;
+      m_autoStartAttempts++;
+      if (m_supportsTouch)
+      {
+         if (m_autoStartCoinSlot == -1)
+            m_autoStartCoinSlot = m_inputActions[GetAddCreditActionId(0)]->NewDirectStateSlot();
+         m_inputActions[GetAddCreditActionId(0)]->SetDirectState(m_autoStartCoinSlot, true);
+         m_autoStartCoinPressed = true;
+         PLOGD << "Autostart: Coin";
+         return;
+      }
+      m_autoStartPressed = true;
       if (m_autoStartDirectStateSlot == -1)
          m_autoStartDirectStateSlot = m_inputActions[m_startActionId]->NewDirectStateSlot();
       m_inputActions[m_startActionId]->SetDirectState(m_autoStartDirectStateSlot, true);

@@ -292,6 +292,8 @@ public:
    void SetCabinetAutoFitMode(int mode);
    float GetCabinetAutoFitPos() const { return m_cabinetAutoFitPos; }
    void SetCabinetAutoFitPos(float pos);
+   // The embedded score display in the room left above a table fitted to the screen (ScoreView.ScoreViewAboveTable)
+   void PlaceScoreViewAboveTable();
 
 private:
    void PrepareFrame();

@@ -300,6 +300,11 @@ private:
    bool m_gameStartedOnce = false;
    bool m_acceptStartupEvents = false;
    bool m_autoStartPressed = false;
+   // On touch screens, autostart inserts a coin first (most machines need a credit), and stops
+   // once a ball moves (the machine kicking one to the plunger) or after a few tries
+   bool m_autoStartCoinPressed = false;
+   int m_autoStartCoinSlot = -1;
+   int m_autoStartAttempts = 0;
    bool m_autoStartDoneOnce = false;
    int m_autoStartDirectStateSlot = -1;
 

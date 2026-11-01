@@ -24,6 +24,7 @@ enum VPinballStatus: CInt {
 enum VPinballSettingsSection: String {
     case standalone = "Standalone"
     case player = "Player"
+    case scoreView = "ScoreView"
     case pluginDMDUtil = "Plugin.DMDUtil"
 }
 

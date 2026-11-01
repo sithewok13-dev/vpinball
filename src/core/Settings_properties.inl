@@ -59,6 +59,7 @@ PropEnumDyn(Backglass, BackglassRotation, "Rotation"s, "Rotate the rendered cont
 // ScoreView Window
 PropEnumDyn(ScoreView, ScoreViewOutput, "Output Mode"s, "Select between disabled, floating, or embedded in another window mode"s, int /* OutputMode */, 0 /* OM_DISABLED */, "Disabled"s,
    "Floating"s, "Embedded in playfield"s);
+PropBool(ScoreView, ScoreViewAboveTable, "Place Above Table"s, "When the table is fitted to the screen automatically and leaves room above it, show the score display (embedded in the playfield) in that room"s, false);
 PropStringDyn(ScoreView, ScoreViewDisplay, "Display"s, "Display used for the main ScoreView window"s, ""s);
 #ifdef ENABLE_BGFX
 PropEnumDyn(ScoreView, ScoreViewFullScreen, "Display Mode"s, "Select between windowed or borderless fullscreen mode"s, int, 0, "Windowed"s, "Borderless Fullscreen"s);

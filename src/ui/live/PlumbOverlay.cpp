@@ -17,6 +17,11 @@ void PlumbOverlay::Update()
 
    const bool isInNudgeSettings = m_player->m_liveUI->m_inGameUI.IsOpened("settings/nudge"s);
 
+   // On a touch screen, the plumb is only shown while setting up nudging: nudges come from touch
+   // regions, and a swinging plumb bob in a corner of the table is only a distraction there
+   if (m_player->m_pininput.HasTouchInput() && !isInNudgeSettings)
+      return;
+
    if (m_lastTiltIndex != m_player->m_physics->m_plumbHandler.GetPlumbTiltIndex())
    {
       m_lastTiltIndex = m_player->m_physics->m_plumbHandler.GetPlumbTiltIndex();
