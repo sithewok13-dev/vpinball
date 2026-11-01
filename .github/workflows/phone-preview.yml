@@ -14,12 +14,14 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      # the builds are uploaded as they are, not zipped (vpinball.yml: archive: false)
+      - uses: actions/download-artifact@v8
         with:
           run-id: 41242920689
           github-token: ${{ github.token }}
           pattern: VPinballX_BGFX-*-linux-x64-Release.tar.gz
           path: dl
+          skip-decompress: true
       - name: Unpack and install Mesa
         run: |
           sudo apt-get update -qq
