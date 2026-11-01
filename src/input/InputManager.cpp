@@ -10,6 +10,8 @@
 #include "input/PlungerHandler.h"
 #include "math/bbox.h"
 #include "parts/ball.h"
+#include "parts/flipper.h"
+#include "parts/plunger.h"
 #include "physics/cabinet/NudgeHandler.h"
 #include "renderer/VRDevice.h"
 #include "ui/live/LiveUI.h"
@@ -432,6 +434,7 @@ void InputManager::ProcessInput()
 
    UpdateRumble();
    UpdateTouchStart();
+   UpdateAutoplay();
 
    // Handle automatic start
    if (m_player->m_ptable->m_tblAutoStartEnabled)
@@ -648,6 +651,172 @@ void InputManager::PushAxisEvent(uint16_t deviceId, uint16_t axisId, uint64_t ti
    }
 }
 
+void InputManager::AutoplayPress(unsigned int actionId, int& slot, bool pressed)
+{
+   if (slot == -1)
+      slot = m_inputActions[actionId]->NewDirectStateSlot();
+   m_inputActions[actionId]->SetDirectState(slot, pressed);
+}
+
+void InputManager::SetAutoplay(bool enable)
+{
+   if (m_autoplay == enable)
+      return;
+   m_autoplay = enable;
+   // whatever it holds is let go
+   const std::pair<unsigned int, int*> held[] = { { GetLeftFlipperActionId(), &m_autoplayLeftSlot }, { GetStagedLeftFlipperActionId(), &m_autoplayLeftStagedSlot },
+      { GetRightFlipperActionId(), &m_autoplayRightSlot }, { GetStagedRightFlipperActionId(), &m_autoplayRightStagedSlot }, { GetLaunchBallActionId(), &m_autoplayLaunchSlot },
+      { GetAddCreditActionId(0), &m_autoplayCoinSlot }, { GetStartActionId(), &m_autoplayStartSlot } };
+   for (const auto& [id, slot] : held)
+      if (*slot != -1)
+         m_inputActions[id]->SetDirectState(*slot, false);
+   m_autoplayFlipUntil[0] = m_autoplayFlipUntil[1] = m_autoplayLaunchUntil = 0;
+   m_autoplayStillSince[0] = m_autoplayStillSince[1] = 0;
+   m_autoplayStartStep = 0;
+   m_autoplayLastMotion = msec();
+   if (m_player && m_player->m_liveUI)
+      m_player->m_liveUI->PushNotification(enable ? "Autoplay: touch the screen to take over"s : "Autoplay off"s, 2500);
+}
+
+void InputManager::UpdateAutoplay()
+{
+   if (!m_autoplay || !m_player->IsPlaying(false))
+      return;
+   const uint32_t now = msec();
+   const PinTable* const table = m_player->m_ptable;
+   const float tableCenterX = (table->m_left + table->m_right) * 0.5f;
+
+   // What moves
+   bool moving = false;
+   for (const Ball* ball : m_player->m_vball)
+      if (ball->GetVelocity().LengthSquared() > 0.25f)
+         moving = true;
+   if (moving)
+      m_autoplayLastMotion = now;
+
+   // Flippers: flip when a ball comes down onto a flipper's rest position, its bat from pivot to tip, within
+   // reach above it (the faster the ball, the earlier), or rests on it for a while (cradled)
+   bool want[2] = { false, false };
+   bool still[2] = { false, false };
+   for (const IEditable* part : table->GetParts())
+   {
+      if (part->GetItemType() != eItemFlipper)
+         continue;
+      const Flipper* const flipper = static_cast<const Flipper*>(part);
+      const int side = flipper->m_d.m_Center.x < tableCenterX ? 0 : 1;
+      const float angle = ANGTORAD(flipper->m_d.m_StartAngle);
+      const Vertex2D pivot = flipper->m_d.m_Center;
+      const Vertex2D tip(pivot.x + flipper->m_d.m_FlipperRadiusMax * sinf(angle), pivot.y - flipper->m_d.m_FlipperRadiusMax * cosf(angle));
+      const Vertex2D bat = tip - pivot;
+      const float batLength2 = bat.LengthSquared();
+      if (batLength2 <= 1.f)
+         continue;
+      for (const Ball* ball : m_player->m_vball)
+      {
+         const vec3& pos = ball->GetPosition();
+         const vec3& vel = ball->GetVelocity();
+         const Vertex2D p(pos.x, pos.y);
+         const float t = clamp(((p - pivot).x * bat.x + (p - pivot).y * bat.y) / batLength2, 0.f, 1.f);
+         const Vertex2D closest = pivot + bat * t;
+         const float distance = (p - closest).Length() - ball->GetRadius() - flipper->m_d.m_EndRadius;
+         if (p.y > closest.y + ball->GetRadius() || t <= 0.05f) // below the bat, or at its pivot: nothing to save there
+            continue;
+         const float speed = sqrtf(vel.x * vel.x + vel.y * vel.y);
+         if (vel.y > 0.f && distance < 25.f + speed * 4.f)
+            want[side] = true;
+         else if (speed < 0.5f && distance < 15.f)
+            still[side] = true;
+      }
+   }
+   for (int side = 0; side < 2; side++)
+   {
+      if (still[side])
+      {
+         if (m_autoplayStillSince[side] == 0)
+            m_autoplayStillSince[side] = now;
+         else if (now - m_autoplayStillSince[side] > 1500) // cradled long enough: shoot it
+            want[side] = true;
+      }
+      else
+         m_autoplayStillSince[side] = 0;
+      if (want[side] && now >= m_autoplayFlipReadyAt[side] && m_autoplayFlipUntil[side] == 0)
+      {
+         m_autoplayFlipUntil[side] = now + 180;
+         m_autoplayFlipReadyAt[side] = now + 350;
+         m_autoplayStillSince[side] = 0;
+      }
+      const bool held = m_autoplayFlipUntil[side] != 0 && now < m_autoplayFlipUntil[side];
+      if (m_autoplayFlipUntil[side] != 0 && !held)
+         m_autoplayFlipUntil[side] = 0;
+      AutoplayPress(side == 0 ? GetLeftFlipperActionId() : GetRightFlipperActionId(), side == 0 ? m_autoplayLeftSlot : m_autoplayRightSlot, held);
+      AutoplayPress(side == 0 ? GetStagedLeftFlipperActionId() : GetStagedRightFlipperActionId(), side == 0 ? m_autoplayLeftStagedSlot : m_autoplayRightStagedSlot, held);
+   }
+
+   // Plunger: a ball resting in front of it is launched (pulled back, then let go)
+   if (m_autoplayLaunchUntil != 0)
+   {
+      if (now >= m_autoplayLaunchUntil)
+      {
+         AutoplayPress(GetLaunchBallActionId(), m_autoplayLaunchSlot, false);
+         m_autoplayLaunchUntil = 0;
+         m_autoplayLaunchReadyAt = now + 2000;
+      }
+   }
+   else if (now >= m_autoplayLaunchReadyAt)
+   {
+      for (const IEditable* part : table->GetParts())
+      {
+         if (part->GetItemType() != eItemPlunger)
+            continue;
+         const Plunger* const plunger = static_cast<const Plunger*>(part);
+         for (const Ball* ball : m_player->m_vball)
+         {
+            const vec3& pos = ball->GetPosition();
+            const float r = ball->GetRadius();
+            if (ball->GetVelocity().LengthSquared() < 0.25f && fabsf(pos.x - plunger->m_d.m_v.x) < plunger->m_d.m_width + r
+               && pos.y > plunger->m_d.m_v.y - plunger->m_d.m_stroke - 3.f * r && pos.y < plunger->m_d.m_v.y + r)
+            {
+               AutoplayPress(GetLaunchBallActionId(), m_autoplayLaunchSlot, true);
+               m_autoplayLaunchUntil = now + 900;
+               break;
+            }
+         }
+         if (m_autoplayLaunchUntil != 0)
+            break;
+      }
+   }
+
+   // A new game once nothing has moved for a while (game over, or before the first): a coin, then Start
+   switch (m_autoplayStartStep)
+   {
+   case 0:
+      if (m_autoplayLaunchUntil == 0 && now - m_autoplayLastMotion > 10000)
+      {
+         AutoplayPress(GetAddCreditActionId(0), m_autoplayCoinSlot, true);
+         m_autoplayStartStep = 1;
+         m_autoplayStartAt = now + 200;
+      }
+      break;
+   case 1:
+      if (now >= m_autoplayStartAt)
+      {
+         AutoplayPress(GetAddCreditActionId(0), m_autoplayCoinSlot, false);
+         AutoplayPress(GetStartActionId(), m_autoplayStartSlot, true);
+         m_autoplayStartStep = 2;
+         m_autoplayStartAt = now + 150;
+      }
+      break;
+   case 2:
+      if (now >= m_autoplayStartAt)
+      {
+         AutoplayPress(GetStartActionId(), m_autoplayStartSlot, false);
+         m_autoplayStartStep = 0;
+         m_autoplayLastMotion = now; // tried: give the machine time before the next try
+      }
+      break;
+   }
+}
+
 void InputManager::UpdateTouchStart()
 {
    if (m_touchStartState == TouchStartState::Idle)
@@ -689,6 +858,14 @@ void InputManager::PushTouchEvent(uint64_t fingerId, float relativeX, float rela
 
    // The score display takes the touches starting on it (held to be moved, resized and faded), and all of
    // them while it's being edited; the touch regions only follow fingers going down and up
+   // A touch ends autoplay: the player takes over
+   if (m_autoplay)
+   {
+      if (phase == TouchPhase::Down)
+         SetAutoplay(false);
+      return;
+   }
+
    if (m_player->m_liveUI && m_player->m_liveUI->OnTouch(fingerId, relativeX, relativeY, static_cast<int>(phase)))
       return;
    if (phase == TouchPhase::Motion)

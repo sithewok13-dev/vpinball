@@ -79,6 +79,16 @@ void HomePage::BuildPage()
             RequestRebuild();
          }));
 
+   // Autoplay, for recording demos: it plays on until the screen is touched
+   if (isTouch && !m_player->m_vrDevice)
+      AddItem(std::make_unique<InGameUIItem>(m_player->m_pininput.IsAutoplay() ? "Stop Autoplay"s : "Autoplay"s, ""s,
+         [this]()
+         {
+            const bool enable = !m_player->m_pininput.IsAutoplay();
+            m_player->m_liveUI->HideUI();
+            m_player->m_pininput.SetAutoplay(enable);
+         }));
+
    if (!hasKeyboard)
       AddItem(std::make_unique<InGameUIItem>(m_player->m_liveUI->m_perfUI.GetPerfMode() != PerfUI::PerfMode::PM_DISABLED ? "Disable FPS"s : "Enable FPS"s, ""s,
          [this]()

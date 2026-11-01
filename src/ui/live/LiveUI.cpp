@@ -832,8 +832,8 @@ void LiveUI::UpdateScoreViewEditor()
       return;
    }
 
-   // Hidden: a small tab to hold, to get it back
-   if (IsScoreViewEditable() && m_player->m_renderer->m_scoreViewOpacity <= 0.f)
+   // Hidden: a small tab to hold, to get it back (not in an autoplayed demo)
+   if (IsScoreViewEditable() && m_player->m_renderer->m_scoreViewOpacity <= 0.f && !m_player->m_pininput.IsAutoplay())
    {
       const vec4 tab = GetScoreViewHitArea();
       const ImVec2 a = toScreen(tab.x, tab.y), b = toScreen(tab.x + tab.z, tab.y + tab.w);
@@ -862,7 +862,7 @@ void LiveUI::UpdateTouchUI()
    // the hint fades out over its last second
    const uint32_t now = msec();
    const float hint = now >= m_touchHintUntil ? 0.f : min(1.f, (float)(m_touchHintUntil - now) / 1000.f);
-   if (!m_showTouchOverlay && hint <= 0.f)
+   if ((!m_showTouchOverlay && hint <= 0.f) || m_player->m_pininput.IsAutoplay())
       return;
 
    const ImGuiIO &io = ImGui::GetIO();

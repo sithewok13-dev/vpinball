@@ -288,6 +288,26 @@ private:
    // The touch Start region inserts a coin, then presses Start a moment later, so a single tap
    // starts a game on machines without credits (most tables) as well as on those with
    void UpdateTouchStart();
+
+public:
+   // Autoplay, for demos: flips when a ball comes down toward a flipper, launches balls resting in the
+   // plunger lane, starts a new game once nothing has moved for a while; a touch on the screen ends it
+   void SetAutoplay(bool enable);
+   bool IsAutoplay() const { return m_autoplay; }
+
+private:
+   void UpdateAutoplay();
+   void AutoplayPress(unsigned int actionId, int& slot, bool pressed);
+   bool m_autoplay = false;
+   int m_autoplayLeftSlot = -1, m_autoplayLeftStagedSlot = -1, m_autoplayRightSlot = -1, m_autoplayRightStagedSlot = -1;
+   int m_autoplayLaunchSlot = -1, m_autoplayCoinSlot = -1, m_autoplayStartSlot = -1;
+   uint32_t m_autoplayFlipUntil[2] = {}; // left, right: held until then
+   uint32_t m_autoplayFlipReadyAt[2] = {}; // and not flipped again before then
+   uint32_t m_autoplayLaunchUntil = 0, m_autoplayLaunchReadyAt = 0;
+   uint32_t m_autoplayLastMotion = 0; // when a ball last moved
+   uint32_t m_autoplayStillSince[2] = {}; // a ball resting on a flipper since then (0: none)
+   int m_autoplayStartStep = 0; // 0: idle, 1: coin in, 2: start pressed
+   uint32_t m_autoplayStartAt = 0;
    enum class TouchStartState { Idle, Waiting, Pressed };
    TouchStartState m_touchStartState = TouchStartState::Idle;
    bool m_touchStartFingerDown = false;
