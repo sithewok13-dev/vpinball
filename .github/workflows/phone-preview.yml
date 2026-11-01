@@ -17,7 +17,7 @@ jobs:
       # the builds are uploaded as they are, not zipped (vpinball.yml: archive: false)
       - uses: actions/download-artifact@v8
         with:
-          run-id: 41242920689
+          run-id: 41270690285
           github-token: ${{ github.token }}
           pattern: VPinballX_BGFX-*-linux-x64-Release.tar.gz
           path: dl
@@ -48,6 +48,7 @@ jobs:
           run 1-today-desktop ''
           run 2-cabinet-fit 'BGSet = 1\nCabinetAutofitMode = 1\nScreenPlayerZ = 40'
           run 3-cabinet-fill 'BGSet = 1\nCabinetAutofitMode = 2\nScreenPlayerZ = 40'
+          run 4-cabinet-fit-score 'BGSet = 1\nCabinetAutofitMode = 1\nScreenPlayerZ = 40\n[ScoreView]\nScoreViewOutput = 2\nScoreViewAboveTable = 1'
           ls -la shots
       - name: Commit the pictures
         run: |
