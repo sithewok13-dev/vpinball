@@ -1,0 +1,122 @@
+2026-11-01 15:42:48.581 INFO  [2788] [VPApp::InitInstance@350] Starting VPX - v10.8.1 Beta (Rev. 6513 (73f48eafe), linux BGFX 64bits)
+2026-11-01 15:42:48.581 INFO  [2788] [VPApp::InitInstance@351] Settings file was loaded from /home/runner/work/vpinball/vpinball/work/vpx.ini
+2026-11-01 15:42:48.581 INFO  [2788] [VPApp::InitInstance@352] Number of logical CPU cores: 4
+2026-11-01 15:42:48.581 INFO  [2788] [VPApp::InitInstance@353] Application path: /home/runner/work/vpinball/vpinball/vpx/
+2026-11-01 15:42:48.581 INFO  [2788] [VPApp::InitInstance@354] Preference path: /home/runner/work/vpinball/vpinball/home/.local/share/VPinballX/10.8
+2026-11-01 15:42:48.582 INFO  [2788] [CaptureAttractCommand::Execute@337] Video capture mode requested for 1 frames at 30FPS from table '/home/runner/work/vpinball/vpinball/work/table.vpz' without loop truncation
+2026-11-01 15:42:48.582 INFO  [2788] [PinTable::LoadGameFromFilename@1447] LoadGameFromFilename /home/runner/work/vpinball/vpinball/work/table.vpz
+2026-11-01 15:42:48.646 INFO  [2788] [PinTable::FinalizeLoadedParts@2065] Images, Sounds, Fonts and Parts loaded
+2026-11-01 15:42:48.647 INFO  [2788] [PinTable::LoadGameFromFilename@1541] Table loaded
+2026-11-01 15:42:48.647 INFO  [2788] [MsgPI::MsgPlugin::Load@556] Plugin vpx loaded (statically linked plugin) [id=1]
+2026-11-01 15:42:48.648 INFO  [2788] [SDLInputHandler::SDLInputHandler@18] SDL input handler registered
+2026-11-01 15:42:48.654 INFO  [2788] [OpenPinDevHandler::OpenPinDevHandler@242] OpenPinDev input handler registered
+2026-11-01 15:42:48.661 INFO  [2788] [VPX::AudioPlayer::AudioPlayer@229] Table sound device was not found (), using default: ALSA default playback device
+2026-11-01 15:42:48.661 INFO  [2788] [VPX::AudioPlayer::AudioPlayer@233] Backglass sound device was not found (), using default: ALSA default playback device
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+2026-11-01 15:42:48.661 ERROR [2788] [ma_context_get_device_info__sdl@71] Failed to open default SDL device.
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+2026-11-01 15:42:48.661 ERROR [2788] [ma_device_init__sdl@118] Failed to open SDL audio device (Error: ALSA: Couldn't open audio device: No such file or directory)
+2026-11-01 15:42:48.661 ERROR [2788] [VPX::AudioPlayer::AudioPlayer@300] Failed to initialize miniaudio for backglass sounds
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+2026-11-01 15:42:48.662 ERROR [2788] [ma_context_get_device_info__sdl@71] Failed to open default SDL device.
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+2026-11-01 15:42:48.662 ERROR [2788] [ma_device_init__sdl@118] Failed to open SDL audio device (Error: ALSA: Couldn't open audio device: No such file or directory)
+2026-11-01 15:42:48.662 ERROR [2788] [VPX::AudioPlayer::AudioPlayer@344] Failed to initialize miniaudio for playfield sounds
+2026-11-01 15:42:48.677 INFO  [2788] [Player::Player@108] SDL video driver: x11
+2026-11-01 15:42:48.677 INFO  [2788] [Player::Player@116] Loading player plugins
+2026-11-01 15:42:48.678 INFO  [2788] [Player::Player@162] Plugin vpx was found but is disabled ()
+2026-11-01 15:42:48.678 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin WMP loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/wmp/plugin-wmp.so) [id=2]
+2026-11-01 15:42:48.678 INFO  [2788] [Player::Player@162] Plugin RemoteControl was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/remote-control/plugin-remote-control.so)
+2026-11-01 15:42:48.678 INFO  [2788] [Player::Player@162] Plugin HelloScript was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/helloscript/plugin-helloscript.so)
+2026-11-01 15:42:48.678 INFO  [2788] [Player::Player@162] Plugin DOF was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/dof/plugin-dof.so)
+2026-11-01 15:42:48.680 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin FlexDMD loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/flexdmd/plugin-flexdmd.so) [id=6]
+2026-11-01 15:42:48.681 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin AltSound loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/altsound/plugin-altsound.so) [id=7]
+2026-11-01 15:42:48.682 INFO  [2788] [PUP:PUPPluginLoad@302] No global PUP folder configured; per-table 'pupvideos' used when present
+2026-11-01 15:42:48.682 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin PUP loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/pup/plugin-pup.so) [id=8]
+2026-11-01 15:42:48.682 INFO  [2788] [Player::Player@162] Plugin HelloWorld was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/helloworld/plugin-helloworld.so)
+2026-11-01 15:42:48.682 INFO  [2788] [Player::Player@162] Plugin DMDUtil was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/dmdutil/plugin-dmdutil.so)
+2026-11-01 15:42:48.682 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin Serum loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/serum/plugin-serum.so) [id=11]
+2026-11-01 15:42:48.683 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin Nixie loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/nixie/plugin-nixie.so) [id=12]
+2026-11-01 15:42:48.683 INFO  [2788] [Player::Player@162] Plugin UpscaleDMD was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/upscaledmd/plugin-upscaledmd.so)
+2026-11-01 15:42:48.683 INFO  [2788] [Player::Player@162] Plugin Inspector was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/inspector/plugin-inspector.so)
+2026-11-01 15:42:48.683 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin B2S loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/b2s/plugin-b2s.so) [id=15]
+2026-11-01 15:42:48.683 INFO  [2788] [Player::Player@162] Plugin AlphaDMD was found but is disabled (/home/runner/work/vpinball/vpinball/vpx/plugins/alphadmd/plugin-alphadmd.so)
+2026-11-01 15:42:48.687 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin PinMAME loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/pinmame/plugin-pinmame.so) [id=17]
+2026-11-01 15:42:48.687 INFO  [2788] [MsgPI::MsgPlugin::Load@552] Plugin VNI loaded (library: /home/runner/work/vpinball/vpinball/vpx/plugins/vni/plugin-vni.so) [id=18]
+2026-11-01 15:42:48.687 INFO  [2788] [Player::Player@232] Creating main window
+2026-11-01 15:42:48.687 INFO  [2788] [VPX::Window::Window@80] No display configured. Using display "screen [0, 0]".
+2026-11-01 15:42:48.687 ERROR [2788] [VPX::Window::Window@175] Failed to get display refresh rate. VPX will use a 60Hz default which may be wrong and cause bad video synchronization.
+2026-11-01 15:42:48.699 INFO  [2788] [VPX::Window::Window@303] Window #0 (645x1398) was created on display screen [0, 0] [700x1500 0Hz SDL_PIXELFORMAT_XRGB8888]
+2026-11-01 15:42:48.699 INFO  [2788] [Player::Player@271] Synchronization mode: 3 with maximum FPS: 60, display FPS: 60
+2026-11-01 15:42:48.699 INFO  [2788] [Player::Player@282] Initializing player
+2026-11-01 15:42:48.699 INFO  [2788] [LoadProgress::SetProgress@18] Initializing Renderer... 5%
+2026-11-01 15:42:48.699 INFO  [2788] [Player::Player@288] Initializing renderer (global states & resources)
+2026-11-01 15:42:48.699 INFO  [2788] [RenderDevice::RenderDevice@1370] Requested graphics backend: Default (auto-selected by BGFX) (valid values: Default, Direct3D11, Direct3D12, OpenGL, Vulkan)
+2026-11-01 15:42:48.882 INFO  [2796] [RenderDevice::RenderThread@494] BGFX initialized using Vulkan backend (645x1398 BGRA8)
+2026-11-01 15:42:48.906 INFO  [2788] [Renderer::Renderer@193] Computing environment map radiance
+2026-11-01 15:42:49.396 INFO  [2788] [Renderer::Renderer@222] Environment map radiance computed
+2026-11-01 15:42:49.604 INFO  [2788] [Player::InitTableSession@440] Compiling script
+2026-11-01 15:42:49.604 INFO  [2788] [Player::InitTableSession@476] Initializing inputs & implicit objects
+2026-11-01 15:42:49.604 INFO  [2788] [Player::InitTableSession@570] Initializing physics
+2026-11-01 15:42:49.604 INFO  [2788] [LoadProgress::SetProgress@18] Initializing Physics... 35%
+2026-11-01 15:42:49.620 INFO  [2788] [PhysicsEngine::PhysicsEngine@47] Initializing octree
+2026-11-01 15:42:49.664 INFO  [2827] [LoadProgress::SetProgress@18] Loading Textures... 45%
+2026-11-01 15:42:49.951 INFO  [2788] [Player::InitTableSession@922] Initializing renderer
+2026-11-01 15:42:50.010 INFO  [2788] [Player::InitTableSession@946] Starting script
+2026-11-01 15:42:50.010 INFO  [2788] [LoadProgress::SetProgress@18] Starting Game Scripts... 90%
+2026-11-01 15:42:50.012 INFO  [2788] [ScriptGlobalTable::GetTextFile@416] Reading script: /home/runner/work/vpinball/vpinball/vpx/scripts/controller.vbs
+2026-11-01 15:42:50.012 INFO  [2788] [VPXPluginAPIImpl::ApplyScriptCOMObjectOverrides@465] COM script object b2s.server overriden to be provided by a plugin
+2026-11-01 15:42:50.012 INFO  [2788] [VPXPluginAPIImpl::ApplyScriptCOMObjectOverrides@465] COM script object vpinmame.controller overriden to be provided by a plugin
+2026-11-01 15:42:50.012 INFO  [2788] [VPXPluginAPIImpl::ApplyScriptCOMObjectOverrides@465] COM script object vpinmame.controller overriden to be provided by a plugin
+2026-11-01 15:42:50.012 INFO  [2788] [VPXPluginAPIImpl::ApplyScriptCOMObjectOverrides@465] COM script object b2s.server overriden to be provided by a plugin
+2026-11-01 15:42:50.012 INFO  [2788] [VPXPluginAPIImpl::ApplyScriptCOMObjectOverrides@465] COM script object b2s.server overriden to be provided by a plugin
+2026-11-01 15:42:50.016 INFO  [2788] [PinTable::EvaluateGlassHeight@4465] Evaluated glass height to 2.465" (Ramp17) - 4.97622" (Primitive52)
+2026-11-01 15:42:50.020 INFO  [2788] [PinTable::EvaluateGlassHeight@4465] Evaluated glass height to 2.465" (Ramp17) - 4.97622" (Primitive52)
+2026-11-01 15:42:50.021 INFO  [2788] [LoadProgress::SetProgress@18] Starting... 100%
+2026-11-01 15:42:50.123 INFO  [2788] [Player::Player@383] Startup done
+2026-11-01 15:42:50.123 INFO  [2788] [Player::OnFocusChanged@1525] Playfield window gained focus
+2026-11-01 15:42:50.319 INFO  [2788] [Renderer::RenderStatics@2165] Performing prerendering of static parts.
+2026-11-01 15:42:57.039 INFO  [2796] [AttractCapture::OnCapture@2205] Captured frame # 1, State of 36 lights : 999999999999                    9999
+2026-11-01 15:42:57.042 INFO  [2788] [Player::~Player@1380] Closing player...
+2026-11-01 15:42:57.347 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin vpx unloaded [id=1]
+2026-11-01 15:42:57.347 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin WMP unloaded [id=2]
+2026-11-01 15:42:57.347 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin FlexDMD unloaded [id=6]
+2026-11-01 15:42:57.347 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin AltSound unloaded [id=7]
+2026-11-01 15:42:57.348 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin PUP unloaded [id=8]
+2026-11-01 15:42:57.348 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin Serum unloaded [id=11]
+2026-11-01 15:42:57.348 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin Nixie unloaded [id=12]
+2026-11-01 15:42:57.348 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin B2S unloaded [id=15]
+2026-11-01 15:42:57.348 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin PinMAME unloaded [id=17]
+2026-11-01 15:42:57.348 INFO  [2788] [MsgPI::MsgPlugin::Unload@582] Plugin VNI unloaded [id=18]
+2026-11-01 15:42:57.528 INFO  [2788] [Player::~Player@1476] Player closed.
+2026-11-01 15:42:57.532 INFO  [2788] [WinMain@268] Closing VPX...
+
+
