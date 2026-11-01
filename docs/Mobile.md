@@ -76,9 +76,8 @@ The screen is divided into invisible areas. Touching an area presses that button
 | Top right | Open the [in-game menu](#the-in-game-menu) |
 | Upper left / upper right | Left / right magna-save |
 | Middle left / middle right | Nudge the table left / right |
-| Lower left / lower right | Left / right flipper |
-| Lower middle | Nudge the table forward |
-| Bottom left | Start a game |
+| Lower left half / lower right half | Left / right flipper |
+| Bottom left | Insert a coin and start a game |
 | Bottom right | Plunger. Hold to pull back, let go to launch |
 
 The first few times you start a table, a message reminds you where the areas are. You can also draw them on screen while playing: open the in-game menu and choose **Enable Touch Overlay**.

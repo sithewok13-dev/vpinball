@@ -63,11 +63,16 @@ InputManager::InputManager(Player* player, Settings& appSettings)
    addTouchRegion(RECT { 50, 10, 100, 30 }, GetRightMagnaActionId(), "MAGNA"s);
    addTouchRegion(RECT { 0, 30, 50, 60 }, GetLeftNudgeActionId(), "NUDGE"s);
    addTouchRegion(RECT { 50, 30, 100, 60 }, GetRightNudgeActionId(), "NUDGE"s);
-   addTouchRegion(RECT { 0, 60, 30, 90 }, GetLeftFlipperActionId(), "FLIPPER"s);
-   addTouchRegion(RECT { 0, 60, 30, 90 }, GetStagedLeftFlipperActionId(), ""s);
-   addTouchRegion(RECT { 30, 60, 70, 100 }, GetCenterNudgeActionId(), "NUDGE"s);
-   addTouchRegion(RECT { 70, 60, 100, 90 }, GetRightFlipperActionId(), "FLIPPER"s);
-   addTouchRegion(RECT { 70, 60, 100, 90 }, GetStagedRightFlipperActionId(), ""s);
+   // Each flipper has half of the lower part of the screen, wherever a thumb lands on its side: no
+   // forward nudge in between, which thumbs drifting inward used to trigger while flipping
+   addTouchRegion(RECT { 0, 60, 50, 90 }, GetLeftFlipperActionId(), "FLIPPER"s);
+   addTouchRegion(RECT { 0, 60, 50, 90 }, GetStagedLeftFlipperActionId(), ""s);
+   addTouchRegion(RECT { 30, 90, 50, 100 }, GetLeftFlipperActionId(), ""s);
+   addTouchRegion(RECT { 30, 90, 50, 100 }, GetStagedLeftFlipperActionId(), ""s);
+   addTouchRegion(RECT { 50, 60, 100, 90 }, GetRightFlipperActionId(), "FLIPPER"s);
+   addTouchRegion(RECT { 50, 60, 100, 90 }, GetStagedRightFlipperActionId(), ""s);
+   addTouchRegion(RECT { 50, 90, 70, 100 }, GetRightFlipperActionId(), ""s);
+   addTouchRegion(RECT { 50, 90, 70, 100 }, GetStagedRightFlipperActionId(), ""s);
    addTouchRegion(RECT { 0, 90, 30, 100 }, GetStartActionId(), "START"s);
    addTouchRegion(RECT { 70, 90, 100, 100 }, GetLaunchBallActionId(), "LAUNCH"s);
    m_touchCoinSlot = m_inputActions[GetAddCreditActionId(0)]->NewDirectStateSlot();
