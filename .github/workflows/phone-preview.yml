@@ -1,0 +1,56 @@
+# Renders VPX's test table at an iPhone's screen size with several view settings, in software
+# (Mesa), and commits the pictures to the phone-preview-shots branch, to compare views without a phone.
+# The build comes from the run named below (its Linux x64 package).
+name: phone-preview
+on:
+  push:
+    branches: [phone-preview]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 41242920689
+          github-token: ${{ github.token }}
+          pattern: VPinballX_BGFX-*-linux-x64-Release.tar.gz
+          path: dl
+      - name: Unpack and install Mesa
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb mesa-vulkan-drivers libgl1-mesa-dri libegl1 libgles2 > /dev/null
+          mkdir vpx
+          find dl -name '*.tar.gz' -exec tar xzf {} -C vpx \;
+          find dl -type f ! -name '*.tar.gz' | head
+          ls -R vpx | head -30
+      - name: Render
+        run: |
+          set -x
+          bin=$(find "$PWD/vpx" -type f -name 'VPinballX_BGFX' | head -1)
+          chmod +x "$bin"
+          mkdir shots
+          # an iPhone 15 Pro Max at half resolution: 645x1398 (6.7", 15.4 x 7.1 cm)
+          run() { # name, extra ini lines
+            rm -rf work && mkdir work && cp tests/assets/test000-default-table.vpx work/table.vpx
+            printf '[Player]\nPlayfieldFullScreen = 0\nPlayfieldWidth = 645\nPlayfieldHeight = 1398\nScreenWidth = 15.4\nScreenHeight = 7.1\n%b\n' "$2" > work/vpx.ini
+            HOME=$PWD/home xvfb-run -a -s "-screen 0 700x1500x24" timeout 600 "$bin" -Ini "$PWD/work/vpx.ini" -CaptureAttract 1 30 "$PWD/work/table.vpx" noloop > "shots/$1.log" 2>&1 || true
+            f=$(find work -name '*.png' | sort | head -1)
+            [ -n "$f" ] && cp "$f" "shots/$1.png"
+            tail -5 "shots/$1.log"
+          }
+          run 1-today-desktop ''
+          run 2-cabinet-fit 'BGSet = 1\nCabinetAutofitMode = 1\nScreenPlayerZ = 40'
+          run 3-cabinet-fill 'BGSet = 1\nCabinetAutofitMode = 2\nScreenPlayerZ = 40'
+          ls -la shots
+      - name: Commit the pictures
+        run: |
+          cd shots
+          git init -q -b phone-preview-shots
+          git config user.name preview && git config user.email preview@localhost
+          git add -A && git commit -q -m "phone preview $GITHUB_SHA"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" phone-preview-shots
