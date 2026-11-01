@@ -17,7 +17,7 @@ jobs:
       # the builds are uploaded as they are, not zipped (vpinball.yml: archive: false)
       - uses: actions/download-artifact@v8
         with:
-          run-id: 41270690285
+          run-id: 41278622437
           github-token: ${{ github.token }}
           pattern: VPinballX_BGFX-*-linux-x64-Release.tar.gz
           path: dl
