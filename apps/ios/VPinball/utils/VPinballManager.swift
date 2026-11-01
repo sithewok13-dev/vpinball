@@ -132,12 +132,18 @@ class VPinballManager {
             saveValue(.player, "asenable", true)
             saveValue(.player, "Autostart", 400)
             saveValue(.player, "AutostartRetry", 600)
-            // The score display in the room left above the table
+            // The score display in the room left above the table, else on its apron
             saveValue(.scoreView, "ScoreViewOutput", 2) // embedded in the playfield
             saveValue(.scoreView, "ScoreViewAboveTable", true)
         }
 
-        saveValue(.standalone, "PhoneViewDefaults", 2)
+        if applied < 3 {
+            // The score display drawn over the table, its background mostly see-through, its digits bright
+            // (touch and hold it to move it, resize it or change this)
+            saveValue(.scoreView, "ScoreViewOpacity", Float(0.6))
+        }
+
+        saveValue(.standalone, "PhoneViewDefaults", 3)
     }
 
     private static func runOnMain(_ body: @escaping @MainActor () -> Void) {

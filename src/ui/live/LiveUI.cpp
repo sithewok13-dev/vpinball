@@ -398,6 +398,7 @@ void LiveUI::RenderUI()
    const int height = static_cast<int>(rotated ? io.DisplaySize.x : io.DisplaySize.y);
 
    UpdateTouchUI();
+   UpdateScoreViewEditor();
 
    ImGui::PushFont(m_baseFont, m_baseFont->LegacySize);
 
@@ -581,6 +582,255 @@ void LiveUI::RenderUI()
 
    NewFrame();
 }
+
+#pragma region ScoreViewEditor
+
+bool LiveUI::IsScoreViewEditable() const
+{
+   return m_player->m_pininput.HasTouchInput() && m_player->m_ptable->GetSettings().GetScoreView_ScoreViewAboveTable()
+      && m_player->m_scoreViewOutput.GetMode() == VPX::RenderOutput::OM_EMBEDDED && m_player->m_renderer->IsAncillaryWindowRendered(VPXWindowId::VPXWINDOW_ScoreView)
+      && !m_inGameUI.IsOpened() && m_player->m_playfieldWnd->GetWidth() < m_player->m_playfieldWnd->GetHeight();
+}
+
+vec4 LiveUI::GetScoreViewHitArea() const
+{
+   const vec4 spot = m_player->GetScoreViewSpot();
+   if (m_scoreViewEdit == ScoreViewEdit::Editing || m_player->m_renderer->m_scoreViewOpacity > 0.f)
+      return spot;
+   // Hidden: a small tab where its bottom edge was, to get it back
+   const float cx = spot.x + spot.z * 0.5f;
+   const float bottom = spot.y + spot.w;
+   return vec4(cx - 0.08f, bottom - 0.03f, 0.16f, 0.03f);
+}
+
+vec4 LiveUI::GetScoreViewSlider() const
+{
+   // Under the display, else over it when it sits at the bottom of the screen, at least half the screen wide
+   const vec4 spot = m_player->GetScoreViewSpot();
+   const float w = max(spot.z, 0.6f);
+   const float x = clamp(spot.x + spot.z * 0.5f - w * 0.5f, 0.02f, 0.98f - w);
+   constexpr float h = 0.05f;
+   const float y = spot.y + spot.w + 0.015f + h < 0.98f ? spot.y + spot.w + 0.015f : spot.y - 0.015f - h;
+   return vec4(x, y, w, h);
+}
+
+static bool IsInside(const vec4& area, float x, float y, float margin = 0.f)
+{
+   return x >= area.x - margin && x <= area.x + area.z + margin && y >= area.y - margin && y <= area.y + area.w + margin;
+}
+
+bool LiveUI::OnTouch(uint64_t finger, float x, float y, int phase)
+{
+   constexpr int Down = static_cast<int>(InputManager::TouchPhase::Down);
+   constexpr int Up = static_cast<int>(InputManager::TouchPhase::Up);
+   const float width = (float)m_player->m_playfieldWnd->GetWidth();
+   const float height = (float)m_player->m_playfieldWnd->GetHeight();
+   auto distance = [width, height](const ImVec2& a, const ImVec2& b) { return sqrtf(sqrf((a.x - b.x) * width) + sqrf((a.y - b.y) * height)); };
+   const ImVec2 pos(x, y);
+
+   switch (m_scoreViewEdit)
+   {
+   case ScoreViewEdit::None:
+      // A finger going down on the display is its own: no nudge or start under it
+      if (phase != Down || !IsScoreViewEditable() || !IsInside(GetScoreViewHitArea(), x, y))
+         return false;
+      m_scoreViewEdit = ScoreViewEdit::Holding;
+      m_holdFinger = finger;
+      m_holdStart = msec();
+      m_holdPos = pos;
+      return true;
+
+   case ScoreViewEdit::Holding:
+      if (finger != m_holdFinger)
+         return false;
+      // Moving away or lifting before the half second: nothing (a tap on the display does nothing)
+      if (phase == Up || distance(pos, m_holdPos) > 12.f * GetDPI())
+         m_scoreViewEdit = ScoreViewEdit::None;
+      return true;
+
+   case ScoreViewEdit::Editing:
+   {
+      vec4 spot = m_player->GetScoreViewSpot();
+      if (phase == Down)
+      {
+         const vec4 slider = GetScoreViewSlider();
+         if (m_sliderFinger == NoFinger && IsInside(slider, x, y, 0.02f))
+            m_sliderFinger = finger;
+         else if (m_dragFinger == NoFinger && IsInside(spot, x, y, 0.03f))
+         {
+            m_dragFinger = finger;
+            m_dragPos = m_dragStart = pos;
+            m_editStartSpot = spot;
+         }
+         else if (m_dragFinger != NoFinger && m_pinchFinger == NoFinger)
+         {
+            m_pinchFinger = finger;
+            m_pinchPos = pos;
+            m_pinchStartDistance = max(1.f, distance(m_dragPos, m_pinchPos));
+            m_editStartSpot = spot;
+         }
+         else if (m_dragFinger == NoFinger && m_sliderFinger == NoFinger)
+         {
+            EndScoreViewEdit(); // a tap away from the display and its slider: done
+            return true;
+         }
+      }
+      else if (phase == Up)
+      {
+         if (finger == m_sliderFinger)
+            m_sliderFinger = NoFinger;
+         if (finger == m_pinchFinger)
+         {
+            m_pinchFinger = NoFinger;
+            m_dragStart = m_dragPos; // the remaining finger drags on from here
+            m_editStartSpot = spot;
+         }
+         if (finger == m_dragFinger)
+         {
+            m_dragFinger = m_pinchFinger;
+            m_dragPos = m_dragStart = m_pinchPos;
+            m_pinchFinger = NoFinger;
+            m_editStartSpot = spot;
+         }
+         return true;
+      }
+
+      if (finger == m_sliderFinger)
+      {
+         const vec4 slider = GetScoreViewSlider();
+         m_player->m_renderer->m_scoreViewOpacity = clamp((x - slider.x) / slider.z, 0.f, 1.f);
+      }
+      if (finger == m_dragFinger)
+         m_dragPos = pos;
+      if (finger == m_pinchFinger)
+         m_pinchPos = pos;
+      if (m_dragFinger != NoFinger && m_pinchFinger != NoFinger && (finger == m_dragFinger || finger == m_pinchFinger))
+      {
+         // Pinched: resized around its center, keeping its shape
+         const float scale = distance(m_dragPos, m_pinchPos) / m_pinchStartDistance;
+         const float w = clamp(m_editStartSpot.z * scale, 0.15f, 1.f);
+         const float h = m_editStartSpot.w * w / m_editStartSpot.z;
+         spot = vec4(m_editStartSpot.x + (m_editStartSpot.z - w) * 0.5f, m_editStartSpot.y + (m_editStartSpot.w - h) * 0.5f, w, h);
+      }
+      else if (finger == m_dragFinger)
+      {
+         // Dragged, snapping to where it goes automatically (above the table, on the apron)
+         spot.x = m_editStartSpot.x + m_dragPos.x - m_dragStart.x;
+         spot.y = m_editStartSpot.y + m_dragPos.y - m_dragStart.y;
+         for (const vec4& snap : { m_player->m_scoreViewTopSpot, m_player->m_scoreViewApronSpot })
+            if (snap.z > 0.f && fabsf(spot.x + spot.z * 0.5f - snap.x - snap.z * 0.5f) < 0.04f && fabsf(spot.y + spot.w * 0.5f - snap.y - snap.w * 0.5f) < 0.03f)
+            {
+               spot.x = snap.x + (snap.z - spot.z) * 0.5f;
+               spot.y = snap.y + (snap.w - spot.w) * 0.5f;
+            }
+      }
+      else
+         return true;
+      spot.x = clamp(spot.x, 0.f, 1.f - spot.z);
+      spot.y = clamp(spot.y, 0.f, 1.f - spot.w);
+      m_player->SetScoreViewSpot(spot);
+      return true;
+   }
+   }
+   return false;
+}
+
+void LiveUI::EndScoreViewEdit()
+{
+   m_scoreViewEdit = ScoreViewEdit::None;
+   m_dragFinger = m_pinchFinger = m_sliderFinger = m_holdFinger = NoFinger;
+   // Kept for this table (or for all of them while the table isn't saved to a file)
+   const bool asTableOverride = m_player->m_ptable->IsOnDisk();
+   Settings& settings = asTableOverride ? g_settingsService.GetActiveSettings() : g_settingsService.GetAppSettings();
+   const vec4 spot = m_player->GetScoreViewSpot();
+   settings.SetScoreView_ScoreViewRelX(spot.x, asTableOverride);
+   settings.SetScoreView_ScoreViewRelY(spot.y, asTableOverride);
+   settings.SetScoreView_ScoreViewRelW(spot.z, asTableOverride);
+   settings.SetScoreView_ScoreViewRelH(spot.w, asTableOverride);
+   settings.SetScoreView_ScoreViewOpacity(m_player->m_renderer->m_scoreViewOpacity, asTableOverride);
+   settings.Save();
+   m_player->SetPlayState(true);
+}
+
+void LiveUI::UpdateScoreViewEditor()
+{
+   const ImGuiIO& io = ImGui::GetIO();
+   ImDrawList* const drawList = ImGui::GetForegroundDrawList();
+   const ImVec2 size = io.DisplaySize;
+   const float dpi = GetDPI();
+   auto toScreen = [size](float x, float y) { return ImVec2(x * size.x, y * size.y); };
+
+   if (m_scoreViewEdit == ScoreViewEdit::Holding)
+   {
+      // A ring filling up around the finger over half a second, then edit mode
+      const float progress = (float)(msec() - m_holdStart) / 500.f;
+      if (progress >= 1.f)
+      {
+         m_scoreViewEdit = ScoreViewEdit::Editing;
+         m_dragFinger = m_holdFinger; // the same finger drags it on
+         m_dragPos = m_dragStart = m_holdPos;
+         m_editStartSpot = m_player->GetScoreViewSpot();
+         m_pinchFinger = m_sliderFinger = NoFinger;
+         m_player->SetPlayState(false);
+      }
+      else
+      {
+         const ImVec2 center = toScreen(m_holdPos.x, m_holdPos.y);
+         const float radius = 34.f * dpi;
+         drawList->AddCircle(center, radius, IM_COL32(255, 255, 255, 60), 48, 5.f * dpi);
+         drawList->PathArcTo(center, radius, -IM_PI * 0.5f, -IM_PI * 0.5f + 2.f * IM_PI * progress, 48);
+         drawList->PathStroke(IM_COL32(255, 255, 255, 230), ImDrawFlags_None, 5.f * dpi);
+         return;
+      }
+   }
+
+   if (m_scoreViewEdit == ScoreViewEdit::Editing)
+   {
+      if (!IsScoreViewEditable() && m_inGameUI.IsOpened())
+      {
+         EndScoreViewEdit();
+         return;
+      }
+      // Its outline, and the transparency slider with its value
+      const vec4 spot = m_player->GetScoreViewSpot();
+      const ImVec2 a = toScreen(spot.x, spot.y), b = toScreen(spot.x + spot.z, spot.y + spot.w);
+      drawList->AddRect(a, b, IM_COL32(255, 255, 255, 230), 6.f * dpi, ImDrawFlags_None, 2.5f * dpi);
+      for (const ImVec2& corner : { a, b, ImVec2(a.x, b.y), ImVec2(b.x, a.y) })
+         drawList->AddCircleFilled(corner, 5.f * dpi, IM_COL32(255, 255, 255, 230));
+
+      const vec4 slider = GetScoreViewSlider();
+      const ImVec2 sa = toScreen(slider.x, slider.y), sb = toScreen(slider.x + slider.z, slider.y + slider.w);
+      drawList->AddRectFilled(sa, sb, IM_COL32(0, 0, 0, 170), 10.f * dpi);
+      const float opacity = m_player->m_renderer->m_scoreViewOpacity;
+      const float trackY = sa.y + (sb.y - sa.y) * 0.68f;
+      const float trackL = sa.x + 14.f * dpi, trackR = sb.x - 14.f * dpi;
+      drawList->AddLine(ImVec2(trackL, trackY), ImVec2(trackR, trackY), IM_COL32(255, 255, 255, 70), 4.f * dpi);
+      const float knobX = trackL + (trackR - trackL) * opacity;
+      drawList->AddLine(ImVec2(trackL, trackY), ImVec2(knobX, trackY), IM_COL32(255, 255, 255, 230), 4.f * dpi);
+      drawList->AddCircleFilled(ImVec2(knobX, trackY), 9.f * dpi, IM_COL32(255, 255, 255, 255));
+      const string label = opacity <= 0.f ? "Hidden"s : std::format("Transparency  {}%", (int)roundf((1.f - opacity) * 100.f));
+      drawList->AddText(ImVec2(trackL, sa.y + 4.f * dpi), IM_COL32(255, 255, 255, 230), label.c_str());
+      const char* const hint = "Drag to move, pinch to resize, tap outside when done";
+      const ImVec2 hintSize = ImGui::CalcTextSize(hint);
+      const float hintY = slider.y > spot.y ? sb.y + 6.f * dpi : sa.y - 6.f * dpi - hintSize.y;
+      drawList->AddText(ImVec2(clamp((sa.x + sb.x - hintSize.x) * 0.5f, 4.f, size.x - hintSize.x - 4.f) + 1.f, hintY + 1.f), IM_COL32(0, 0, 0, 200), hint);
+      drawList->AddText(ImVec2(clamp((sa.x + sb.x - hintSize.x) * 0.5f, 4.f, size.x - hintSize.x - 4.f), hintY), IM_COL32(255, 255, 255, 230), hint);
+      return;
+   }
+
+   // Hidden: a small tab to hold, to get it back
+   if (IsScoreViewEditable() && m_player->m_renderer->m_scoreViewOpacity <= 0.f)
+   {
+      const vec4 tab = GetScoreViewHitArea();
+      const ImVec2 a = toScreen(tab.x, tab.y), b = toScreen(tab.x + tab.z, tab.y + tab.w);
+      drawList->AddRectFilled(a, b, IM_COL32(0, 0, 0, 110), (b.y - a.y) * 0.5f);
+      const char* const text = "SCORES";
+      const ImVec2 textSize = ImGui::CalcTextSize(text);
+      drawList->AddText(ImVec2((a.x + b.x - textSize.x) * 0.5f, (a.y + b.y - textSize.y) * 0.5f), IM_COL32(255, 255, 255, 150), text);
+   }
+}
+
+#pragma endregion
 
 void LiveUI::ShowTouchHint(uint32_t lengthMs)
 {

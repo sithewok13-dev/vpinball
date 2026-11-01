@@ -3801,10 +3801,11 @@ void Renderer::AddAncillaryContent(VPXRenderContext2D* ctx, const float srcX, co
    bounds.w = max(bounds.w, (srcY + srcH) / ctx->srcHeight);
 }
 
-void Renderer::DrawImage(VPXRenderContext2D* ctx, VPXTexture texture, const float tintR, const float tintG, const float tintB, const float alpha, const float texX, const float texY,
+void Renderer::DrawImage(VPXRenderContext2D* ctx, VPXTexture texture, const float tintR, const float tintG, const float tintB, const float alphaIn, const float texX, const float texY,
    const float texW, const float texH, const float pivotX, const float pivotY, const float rotation, const float srcX, const float srcY, const float srcW, const float srcH)
 {
    assert(g_pplayer && g_pplayer->m_renderer && ctx->rendererData == &g_pplayer->m_renderer->m_ancillaryRenderSetup);
+   const float alpha = alphaIn * g_pplayer->m_renderer->m_ancillaryRenderSetup.imageAlpha; // A translucent display fades its images as a whole
    if (alpha <= 0.f) // Alpha blended, so alpha = 0 means not visible
       return;
    AddAncillaryContent(ctx, srcX, srcY, srcW, srcH); // Image rotation ignored: only the area used by the layout is wanted
@@ -3884,12 +3885,35 @@ void Renderer::DrawMatrixDisplay(VPXRenderContext2D* ctx, VPXDisplayRenderStyle 
       { vx1, vy2, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f }
    };
    static_cast<AncillaryRenderSetup*>(ctx->rendererData)->displayTransform.TransformVertices(vertices, vertices, 4);
-   if (style == VPXDMDStyle_Pixelated || style == VPXDMDStyle_Smoothed || style == VPXDMDStyle_CRT)
+   // Over a table showing through (translucent display), the dots are added as light, as a DMD flasher in
+   // additive mode (see Flasher::Render): unlit dots add nothing, so only the lit ones show over the table
+   const AncillaryRenderSetup& setup = *static_cast<AncillaryRenderSetup*>(ctx->rendererData);
+   const bool isCRT = style == VPXDMDStyle_Pixelated || style == VPXDMDStyle_Smoothed || style == VPXDMDStyle_CRT;
+   float dispAlpha = alpha, addModulate = 0.f, dispBrightness = brightness;
+   if (setup.translucent)
+   {
+      dispBrightness = brightness * setup.contentFade;
+      if (isCRT || !g_pplayer->m_renderer->IsLegacyDMDRenderer(style))
+      {
+         rdl->SetRenderState(RenderState::ALPHABLENDENABLE, RenderState::RS_TRUE);
+         rdl->SetRenderState(RenderState::SRCBLEND, RenderState::SRC_ALPHA);
+         rdl->SetRenderState(RenderState::DESTBLEND, RenderState::INVSRC_COLOR);
+         rdl->SetRenderState(RenderState::BLENDOP, RenderState::BLENDOP_REVSUBTRACT);
+         dispAlpha = addModulate = 0.0001f; // the smallest 'modulate vs add': pure additive (0 would ask for an opaque output)
+      }
+      else
+      {
+         // The legacy renderer has no additive encoding: faded as a whole
+         rdl->EnableAlphaBlend(false);
+         dispAlpha = alpha * setup.contentFade;
+      }
+   }
+   if (isCRT)
    {
 #if !defined(ENABLE_BGFX)
       return; // just to avoid a crash
 #endif
-      g_pplayer->m_renderer->SetupCRTRender(style - VPXDMDStyle_Pixelated, ctx->is2D, vec3(dispTintR, dispTintG, dispTintB), brightness, dTex, alpha, 0.f, // Never additive, this path draws opaque (blending is disabled above)
+      g_pplayer->m_renderer->SetupCRTRender(style - VPXDMDStyle_Pixelated, ctx->is2D, vec3(dispTintR, dispTintG, dispTintB), dispBrightness, dTex, dispAlpha, addModulate, // Opaque (blending disabled above) unless translucent
          isLinearOutput ? Renderer::ColorSpace::Linear : Renderer::ColorSpace::Reinhard_sRGB, //
          vertices, vec4(dispPadL, dispPadT, dispPadR, dispPadB), vec3(glassTintR, glassTintG, glassTintB), glassRoughness, gTex.get(),
          vec4(glassAreaX, glassAreaY, glassAreaW, glassAreaH), //
@@ -3897,7 +3921,7 @@ void Renderer::DrawMatrixDisplay(VPXRenderContext2D* ctx, VPXDisplayRenderStyle 
    }
    else
    {
-      g_pplayer->m_renderer->SetupDMDRender(style, ctx->is2D, vec3(dispTintR, dispTintG, dispTintB), brightness, dTex, alpha, 0.f, // Never additive, this path draws opaque (blending is disabled above)
+      g_pplayer->m_renderer->SetupDMDRender(style, ctx->is2D, vec3(dispTintR, dispTintG, dispTintB), dispBrightness, dTex, dispAlpha, addModulate, // Opaque (blending disabled above) unless translucent
          isLinearOutput ? Renderer::ColorSpace::Linear : Renderer::ColorSpace::Reinhard_sRGB, //
          vertices, vec4(dispPadL, dispPadT, dispPadR, dispPadB), vec3(glassTintR, glassTintG, glassTintB), glassRoughness, gTex.get(),
          vec4(glassAreaX, glassAreaY, glassAreaW, glassAreaH), //
@@ -3940,7 +3964,10 @@ void Renderer::DrawSegmentDisplay(VPXRenderContext2D* ctx, VPXSegDisplayRenderSt
       { vx1, vy2, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f }
    };
    static_cast<AncillaryRenderSetup*>(ctx->rendererData)->displayTransform.TransformVertices(vertices, vertices, 4);
-   g_pplayer->m_renderer->SetupSegmentRenderer(style, ctx->is2D, vec3(dispTintR, dispTintG, dispTintB), brightness, (Renderer::SegmentFamily)shapeHint, type, state,
+   // Max blended, so unlit segments leave a table showing through as it is: a translucent display only dims them
+   const AncillaryRenderSetup& setup = *static_cast<AncillaryRenderSetup*>(ctx->rendererData);
+   g_pplayer->m_renderer->SetupSegmentRenderer(style, ctx->is2D, vec3(dispTintR, dispTintG, dispTintB), setup.translucent ? brightness * setup.contentFade : brightness,
+      (Renderer::SegmentFamily)shapeHint, type, state,
       isLinearOutput ? Renderer::ColorSpace::Linear : Renderer::ColorSpace::Reinhard_sRGB, vertices, vec4(dispPadL, dispPadT, dispPadR, dispPadB), vec3(glassTintR, glassTintG, glassTintB),
       glassRoughness, gTex.get(), vec4(glassAreaX, glassAreaY, glassAreaW, glassAreaH), vec3(glassAmbientR, glassAmbientG, glassAmbientB));
    rdl->DrawTexturedQuad(rdl->m_DMDShader, vertices, true, g_pplayer->m_renderer->m_ancillaryRenderSetup.depthbias);
@@ -4105,6 +4132,17 @@ RenderTarget* Renderer::SetupAncillaryRenderTarget(
 // Pages of the in game UI adjusting the displays, indexed by VPXWindowId
 static const string s_displaySettingsPages[] = { "settings/display_playfield"s, "settings/display_backglass"s, "settings/display_scoreview"s, "settings/display_topper"s };
 
+float Renderer::GetEmbeddedOpacity(VPXWindowId window) const
+{
+   // Only the score display can be translucent so far, and only embedded in the playfield
+   if (window != VPXWindowId::VPXWINDOW_ScoreView || g_pplayer->m_scoreViewOutput.GetMode() != VPX::RenderOutput::OM_EMBEDDED)
+      return 1.f;
+   // Fully shown while its display settings page is open, so it can be lined up
+   if (g_pplayer->m_liveUI->m_inGameUI.IsOpened(s_displaySettingsPages[window]))
+      return 1.f;
+   return clamp(m_scoreViewOpacity, 0.f, 1.f);
+}
+
 void Renderer::DrawEmbeddedQuad(RenderTarget* outputRT, int x, int y, int w, int h, float r, float g, float b)
 {
    Vertex3D_NoTex2 vertices[4] = { { 1.f, 1.f, 0.f, 0.f, 0.f, 1.f, 1.f, 1.f }, //
@@ -4151,6 +4189,23 @@ void Renderer::ClearEmbeddedAncillaryWindow(VPXWindowId window, const VPX::Rende
    RenderDevice* const rd = m_renderDevice;
    rd->ResetRenderState();
    rd->SetRenderState(RenderState::ZENABLE, RenderState::RS_FALSE);
+   if (const float opacity = GetEmbeddedOpacity(window); opacity < 1.f)
+   {
+      // A translucent display: the table shows through, darkened as much as the display's background is
+      // opaque (it fades out from 100% to 50% opacity): dst' = dst * (1 - background)
+      const float background = clamp(opacity * 2.f - 1.f, 0.f, 1.f);
+      if (background > 0.f)
+      {
+         rd->SetRenderState(RenderState::ZWRITEENABLE, RenderState::RS_FALSE);
+         rd->SetRenderState(RenderState::ALPHABLENDENABLE, RenderState::RS_TRUE);
+         rd->SetRenderState(RenderState::SRCBLEND, RenderState::ZERO);
+         rd->SetRenderState(RenderState::DESTBLEND, RenderState::INVSRC_COLOR);
+         rd->SetRenderState(RenderState::BLENDOP, RenderState::BLENDOP_ADD);
+         DrawEmbeddedQuad(outputRT, m_outputX, m_outputY, m_outputW, m_outputH, background, background, background);
+      }
+      UpdateBasicShaderMatrix();
+      return;
+   }
    rd->SetRenderState(RenderState::ZWRITEENABLE, RenderState::RS_TRUE); // Also clear depth to avoid AO artefacts
    DrawEmbeddedQuad(outputRT, m_outputX, m_outputY, m_outputW, m_outputH, 0.f, 0.f, 0.f);
 
@@ -4182,7 +4237,8 @@ void Renderer::RenderAncillaryWindow(VPXWindowId window, const VPX::RenderOutput
    if (outputRT == nullptr)
       return;
 
-   if (output.GetMode() == VPX::RenderOutput::OM_EMBEDDED)
+   const float opacity = GetEmbeddedOpacity(window);
+   if (output.GetMode() == VPX::RenderOutput::OM_EMBEDDED && opacity >= 1.f)
    {
       // Remember the region so ApplyTonemapping can redo it without the table's color grade. The
       // content is rotated inside the [0..1] square before being mapped onto this rectangle, so
@@ -4200,6 +4256,11 @@ void Renderer::RenderAncillaryWindow(VPXWindowId window, const VPX::RenderOutput
       const vec4& region = m_embeddedRegions.back();
       rd->GetCurrentPass()->m_areaOfInterest = vec4(-1.f + 2.f * region.x, 1.f - 2.f * region.w, -1.f + 2.f * region.z, 1.f - 2.f * region.y);
    }
+   else if (output.GetMode() == VPX::RenderOutput::OM_EMBEDDED)
+   {
+      // Translucent: the table shows through, so the region keeps the table's color grade (and so does the content)
+      rd->AddRenderTargetDependency(GetBloomBufferTexture());
+   }
 
    rd->ResetRenderState();
    if (output.GetMode() == VPX::RenderOutput::OM_WINDOW)
@@ -4211,12 +4272,19 @@ void Renderer::RenderAncillaryWindow(VPXWindowId window, const VPX::RenderOutput
    const bool swapAxes = (rotation % 180) != 0;
    VPXRenderContext2D& context = GetAncillaryRenderContext(window, static_cast<float>(swapAxes ? m_outputH : m_outputW),
       static_cast<float>(swapAxes ? m_outputW : m_outputH), true, isOutputLinear, 0.f);
+   // A translucent display: content fades out from 50% to 0% opacity, images as a whole
+   m_ancillaryRenderSetup.translucent = opacity < 1.f;
+   m_ancillaryRenderSetup.contentFade = clamp(opacity * 2.f, 0.f, 1.f);
+   m_ancillaryRenderSetup.imageAlpha = opacity;
    for (auto& renderer : ancillaryWndRenderers)
    {
       rendered = renderer.Render(&context, renderer.context);
       if (rendered)
          break;
    }
+   m_ancillaryRenderSetup.translucent = false;
+   m_ancillaryRenderSetup.contentFade = 1.f;
+   m_ancillaryRenderSetup.imageAlpha = 1.f;
    m_ancillaryWndRendered[window] = rendered;
 
    // Area used by the content, turned like it onto the output (to fit the output to it)

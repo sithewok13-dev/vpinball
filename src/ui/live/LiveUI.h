@@ -49,6 +49,11 @@ public:
    // Shows the touch regions, labelled, for a while (when a table starts, for players new to them)
    void ShowTouchHint(uint32_t lengthMs);
 
+   // A finger on the playfield (phase: InputManager::TouchPhase), true when the embedded score display takes
+   // it: held for half a second, the display goes into edit mode (game paused), to be dragged, pinched and
+   // faded, a tap outside of it ending the edit
+   bool OnTouch(uint64_t finger, float x, float y, int phase);
+
    unsigned int PushNotification(const string &message, const int lengthMs, const unsigned int reuseId = 0) { return m_notificationOverlay.PushNotification(message, lengthMs, reuseId); }
 
    // Ball Control
@@ -92,6 +97,25 @@ private:
    // Touch UI overlay
    void UpdateTouchUI();
    bool m_showTouchOverlay;
+
+   // The score display's edit mode (see OnTouch), positions relative to the playfield window
+   enum class ScoreViewEdit { None, Holding, Editing };
+   static constexpr uint64_t NoFinger = ~0ull;
+   bool IsScoreViewEditable() const;
+   vec4 GetScoreViewHitArea() const; // the display, or the tab left of it once hidden
+   vec4 GetScoreViewSlider() const;
+   void UpdateScoreViewEditor();
+   void EndScoreViewEdit();
+   ScoreViewEdit m_scoreViewEdit = ScoreViewEdit::None;
+   uint64_t m_holdFinger = NoFinger;
+   uint32_t m_holdStart = 0;
+   ImVec2 m_holdPos;
+   uint64_t m_dragFinger = NoFinger;
+   uint64_t m_pinchFinger = NoFinger;
+   uint64_t m_sliderFinger = NoFinger;
+   ImVec2 m_dragPos, m_dragStart, m_pinchPos;
+   float m_pinchStartDistance = 0.f;
+   vec4 m_editStartSpot;
    uint32_t m_touchHintUntil = 0;
 
    // Emulated plumb overlay

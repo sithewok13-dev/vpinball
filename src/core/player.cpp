@@ -1666,43 +1666,73 @@ void Player::SetCabinetAutoFitMode(int mode)
 
 void Player::PlaceScoreViewAboveTable()
 {
-   if (!m_ptable->GetSettings().GetScoreView_ScoreViewAboveTable() || m_scoreViewOutput.GetMode() != VPX::RenderOutput::OM_EMBEDDED || m_cabinetAutoFitMode == 0
-      || m_ptable->GetViewMode() != ViewSetupID::BG_FULLSCREEN)
+   m_renderer->m_scoreViewOpacity = m_ptable->GetSettings().GetScoreView_ScoreViewOpacity();
+   m_scoreViewTopSpot = m_scoreViewApronSpot = vec4(0.f, 0.f, 0.f, 0.f);
+   if (!m_ptable->GetSettings().GetScoreView_ScoreViewAboveTable() || m_scoreViewOutput.GetMode() != VPX::RenderOutput::OM_EMBEDDED)
       return;
    const int width = m_playfieldWnd->GetWidth();
    const int height = m_playfieldWnd->GetHeight();
    if (width >= height)
-      return; // a landscape screen leaves no room above the table
+      return; // portrait screens only
 
-   // Where the table's top lands on screen (as LiveRenderContext::Project), at the glass' height:
-   // ramps and toys at the back stand above the playfield and, seen from the player, reach higher
-   // up the screen than the playfield's own edge, but never above the glass
-   const Matrix3D mvp = m_renderer->GetMVP().GetModelViewProj(0);
-   const ViewSetup& viewSetup = m_ptable->GetViewSetup();
-   const float z = viewSetup.mMode == VLM_WINDOW ? viewSetup.mWindowTopZOfs : 0.f;
-   float top = (float)height;
-   for (const float x : { m_ptable->m_left, (m_ptable->m_left + m_ptable->m_right) * 0.5f, m_ptable->m_right })
+   // The 2 spots it goes to (relative to the window: x, y, width, height), also those it snaps to when moved
+   // by hand: the room above the table if there's some, and the middle of the apron, between the START and
+   // LAUNCH touch regions (30% of the width each side), a display's usual 4:1 shape
+   const float aspect = (float)width / (float)height;
+   m_scoreViewApronSpot = vec4(0.30f, 0.995f - 0.40f * aspect / 4.f, 0.40f, 0.40f * aspect / 4.f);
+   if (m_cabinetAutoFitMode != 0 && m_ptable->GetViewMode() == ViewSetupID::BG_FULLSCREEN)
    {
-      const float y = m_ptable->m_top;
-      const float yp = mvp._12 * x + mvp._22 * y + mvp._32 * z + mvp._42;
-      const float wp = mvp._14 * x + mvp._24 * y + mvp._34 * z + mvp._44;
-      if (wp > 1e-10f)
-         top = min(top, (wp - yp) * 0.5f * (float)height / wp);
+      // Where the table's top lands on screen (as LiveRenderContext::Project), at the glass' height:
+      // ramps and toys at the back stand above the playfield and, seen from the player, reach higher
+      // up the screen than the playfield's own edge, but never above the glass
+      const Matrix3D mvp = m_renderer->GetMVP().GetModelViewProj(0);
+      const ViewSetup& viewSetup = m_ptable->GetViewSetup();
+      const float z = viewSetup.mMode == VLM_WINDOW ? viewSetup.mWindowTopZOfs : 0.f;
+      float top = 1.f;
+      for (const float x : { m_ptable->m_left, (m_ptable->m_left + m_ptable->m_right) * 0.5f, m_ptable->m_right })
+      {
+         const float y = m_ptable->m_top;
+         const float yp = mvp._12 * x + mvp._22 * y + mvp._32 * z + mvp._42;
+         const float wp = mvp._14 * x + mvp._24 * y + mvp._34 * z + mvp._44;
+         if (wp > 1e-10f)
+            top = min(top, (wp - yp) * 0.5f / wp);
+      }
+      // only when there's real room: a strip of at least 6% of the screen
+      if (const float room = top - 0.01f; room >= 0.06f)
+         m_scoreViewTopSpot = vec4(0.f, 0.f, 1.f, room);
    }
 
-   // only when there's real room, a strip of at least 6% of the screen; else no score display
-   // rather than one over the table (its size from the settings may cover all of it)
-   const int room = (int)top - height / 100;
-   if (room < height * 6 / 100)
-   {
-      m_scoreViewOutput.SetMode(m_ptable->GetSettings(), VPX::RenderOutput::OM_DISABLED);
-      PLOGI << "No room above the table for the score display";
-      return;
-   }
+   // Placed by hand (touch and hold it), else above the table if there's room, else on the apron
+   const Settings& settings = m_ptable->GetSettings();
+   vec4 spot(settings.GetScoreView_ScoreViewRelX(), settings.GetScoreView_ScoreViewRelY(), settings.GetScoreView_ScoreViewRelW(), settings.GetScoreView_ScoreViewRelH());
+   if (spot.z <= 0.f || spot.w <= 0.f)
+      spot = m_scoreViewTopSpot.z > 0.f ? m_scoreViewTopSpot : m_scoreViewApronSpot;
+   SetScoreViewSpot(spot);
+}
+
+void Player::SetScoreViewSpot(const vec4& spot)
+{
    VPX::EmbeddedWindow* const scoreView = m_scoreViewOutput.GetEmbeddedWindow();
-   scoreView->SetPos(0, 0);
-   scoreView->SetSize(width, room);
-   PLOGI << "Score display placed above the table: " << width << "x" << room;
+   if (scoreView == nullptr)
+      return;
+   const float width = (float)m_playfieldWnd->GetWidth();
+   const float height = (float)m_playfieldWnd->GetHeight();
+   const int w = max(1, (int)(spot.z * width));
+   const int h = max(1, (int)(spot.w * height));
+   scoreView->SetPos(clamp((int)(spot.x * width), 0, (int)width - w), clamp((int)(spot.y * height), 0, (int)height - h));
+   scoreView->SetSize(w, h);
+}
+
+vec4 Player::GetScoreViewSpot() const
+{
+   const VPX::EmbeddedWindow* const scoreView = m_scoreViewOutput.GetEmbeddedWindow();
+   if (scoreView == nullptr)
+      return vec4(0.f, 0.f, 0.f, 0.f);
+   int x, y;
+   scoreView->GetPos(x, y);
+   const float width = (float)m_playfieldWnd->GetWidth();
+   const float height = (float)m_playfieldWnd->GetHeight();
+   return vec4((float)x / width, (float)y / height, (float)scoreView->GetWidth() / width, (float)scoreView->GetHeight() / height);
 }
 
 void Player::SetCabinetAutoFitPos(float pos)

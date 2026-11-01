@@ -672,7 +672,7 @@ void InputManager::UpdateTouchStart()
    }
 }
 
-void InputManager::PushTouchEvent(float relativeX, float relativeY, uint64_t timestampNs, bool isPressed)
+void InputManager::PushTouchEvent(uint64_t fingerId, float relativeX, float relativeY, uint64_t timestampNs, TouchPhase phase)
 {
    // Discard input events until the player has been running for a few frames to avoid triggering actions during table startup
    // (during initial table load, the loading UI is displayed and interactive, so events must flow)
@@ -681,6 +681,14 @@ void InputManager::PushTouchEvent(float relativeX, float relativeY, uint64_t tim
 
    if (m_player->IsVR())
       return;
+
+   // The score display takes the touches starting on it (held to be moved, resized and faded), and all of
+   // them while it's being edited; the touch regions only follow fingers going down and up
+   if (m_player->m_liveUI && m_player->m_liveUI->OnTouch(fingerId, relativeX, relativeY, static_cast<int>(phase)))
+      return;
+   if (phase == TouchPhase::Motion)
+      return;
+   const bool isPressed = phase == TouchPhase::Down;
 
    POINT point;
    point.x = (int)((float)m_player->m_playfieldWnd->GetWidth() * relativeX);

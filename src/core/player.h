@@ -292,8 +292,15 @@ public:
    void SetCabinetAutoFitMode(int mode);
    float GetCabinetAutoFitPos() const { return m_cabinetAutoFitPos; }
    void SetCabinetAutoFitPos(float pos);
-   // The embedded score display in the room left above a table fitted to the screen (ScoreView.ScoreViewAboveTable)
+   // The embedded score display placed on a portrait screen (ScoreView.ScoreViewAboveTable): where it was put by
+   // hand, else in the room left above a table fitted to the screen, else on its apron
    void PlaceScoreViewAboveTable();
+   // Its place relative to the playfield window (x, y, width, height)
+   void SetScoreViewSpot(const vec4& spot);
+   vec4 GetScoreViewSpot() const;
+   // Where it goes automatically, also where it snaps to when moved by hand (no room above the table: width 0)
+   vec4 m_scoreViewTopSpot = vec4(0.f, 0.f, 0.f, 0.f);
+   vec4 m_scoreViewApronSpot = vec4(0.f, 0.f, 0.f, 0.f);
 
 private:
    void PrepareFrame();

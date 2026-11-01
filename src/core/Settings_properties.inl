@@ -59,7 +59,12 @@ PropEnumDyn(Backglass, BackglassRotation, "Rotation"s, "Rotate the rendered cont
 // ScoreView Window
 PropEnumDyn(ScoreView, ScoreViewOutput, "Output Mode"s, "Select between disabled, floating, or embedded in another window mode"s, int /* OutputMode */, 0 /* OM_DISABLED */, "Disabled"s,
    "Floating"s, "Embedded in playfield"s);
-PropBool(ScoreView, ScoreViewAboveTable, "Place Above Table"s, "When the table is fitted to the screen automatically and leaves room above it, show the score display (embedded in the playfield) in that room"s, false);
+PropBool(ScoreView, ScoreViewAboveTable, "Automatic Placement"s, "When the table is fitted to a portrait screen automatically, place the score display (embedded in the playfield) in the room above the table, else on its apron, unless it was placed by hand (touch and hold it)"s, false);
+PropFloat(ScoreView, ScoreViewRelX, "Placed X"s, "Left of the score display placed by hand, relative to the playfield window's width (-1 for automatic placement)"s, -1.f, 1.f, -1.f);
+PropFloat(ScoreView, ScoreViewRelY, "Placed Y"s, "Top of the score display placed by hand, relative to the playfield window's height"s, -1.f, 1.f, -1.f);
+PropFloat(ScoreView, ScoreViewRelW, "Placed Width"s, "Width of the score display placed by hand, relative to the playfield window's width"s, -1.f, 1.f, -1.f);
+PropFloat(ScoreView, ScoreViewRelH, "Placed Height"s, "Height of the score display placed by hand, relative to the playfield window's height"s, -1.f, 1.f, -1.f);
+PropFloat(ScoreView, ScoreViewOpacity, "Opacity"s, "Opacity of the embedded score display: from 100% to 50% its background fades out, then its content, 0% hiding it"s, 0.f, 1.f, 1.f);
 PropStringDyn(ScoreView, ScoreViewDisplay, "Display"s, "Display used for the main ScoreView window"s, ""s);
 #ifdef ENABLE_BGFX
 PropEnumDyn(ScoreView, ScoreViewFullScreen, "Display Mode"s, "Select between windowed or borderless fullscreen mode"s, int, 0, "Windowed"s, "Borderless Fullscreen"s);

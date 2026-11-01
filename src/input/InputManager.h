@@ -111,7 +111,9 @@ public:
    // Input events are discarded during the first game frames, except while this is set (to detect all buttons held at startup)
    void SetAcceptStartupEvents(bool accept) { m_acceptStartupEvents = accept; }
    void PushAxisEvent(uint16_t deviceId, uint16_t axisId, uint64_t timestampNs, float position);
-   void PushTouchEvent(float relativeX, float relativeY, uint64_t timestampNs, bool isPressed);
+   enum class TouchPhase { Down, Up, Motion };
+   // A finger on the playfield window, at a position relative to its size
+   void PushTouchEvent(uint64_t fingerId, float relativeX, float relativeY, uint64_t timestampNs, TouchPhase phase);
 
    void AddAxisListener(std::function<void()> listener) { m_axisListeners.push_back(std::move(listener)); }
    void ClearAxisListeners() { m_axisListeners.clear(); }

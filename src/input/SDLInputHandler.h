@@ -112,8 +112,10 @@ public:
 
       case SDL_EVENT_FINGER_DOWN:
       case SDL_EVENT_FINGER_UP:
+      case SDL_EVENT_FINGER_MOTION:
          if (e.tfinger.windowID == SDL_GetWindowID(g_pplayer->m_playfieldWnd->GetCore()))
-            m_pininput.PushTouchEvent(e.tfinger.x, e.tfinger.y, e.tfinger.timestamp, e.type == SDL_EVENT_FINGER_DOWN);
+            m_pininput.PushTouchEvent(static_cast<uint64_t>(e.tfinger.fingerID), e.tfinger.x, e.tfinger.y, e.tfinger.timestamp,
+               e.type == SDL_EVENT_FINGER_DOWN ? InputManager::TouchPhase::Down : e.type == SDL_EVENT_FINGER_UP ? InputManager::TouchPhase::Up : InputManager::TouchPhase::Motion);
          break;
 
       default: break;

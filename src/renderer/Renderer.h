@@ -290,6 +290,13 @@ public:
    VPXRenderContext2D& GetAncillaryRenderContext(
       VPXWindowId window, float width, float height, bool is2D, bool isOutputLinear, float depthbias, const Matrix3D& displayTransform = Matrix3D::MatrixIdentity());
 
+   // Whether a renderer drew this ancillary window on the last frame
+   bool IsAncillaryWindowRendered(VPXWindowId window) const { return m_ancillaryWndRendered[window]; }
+
+   // Opacity of the embedded score display (ScoreView.ScoreViewOpacity): from 1 to 0.5 its background
+   // fades out (the table showing through), then its content, 0 hiding it
+   float m_scoreViewOpacity = 1.f;
+
 private:
    void SetSpaceReference(PartGroupData::SpaceReference spaceReference, bool force);
    void RenderItem(IEditable* const renderable, bool isNoBackdrop);
@@ -331,6 +338,7 @@ private:
    RenderTarget* SetupAncillaryRenderTarget(VPXWindowId window, const VPX::RenderOutput& output, RenderTarget* embedRT, int& outputX, int& outputY, int& outputW, int& outputH, bool& isOutputLinear);
    void ClearEmbeddedAncillaryWindow(VPXWindowId window, const VPX::RenderOutput& output, RenderTarget* embedRT);
    void DrawEmbeddedQuad(RenderTarget* outputRT, int x, int y, int w, int h, float r, float g, float b);
+   float GetEmbeddedOpacity(VPXWindowId window) const; // 1 but for a translucent score display
    void RenderAncillaryWindow(VPXWindowId window, const VPX::RenderOutput& output, RenderTarget* embedRT, const vector<AncillaryRendererDef>& ancillaryWndRenderers);
    std::unique_ptr<RenderTarget> m_ancillaryWndHdrRT[VPXWindowId::VPXWINDOW_Topper + 1];
    bool m_ancillaryWndRendered[VPXWindowId::VPXWINDOW_Topper + 1] = {}; // Whether a renderer claimed the window on the last frame
@@ -344,6 +352,11 @@ private:
       float depthbias;
       Matrix3D displayTransform;
       vec4 contentBounds; // Union of the drawn source rectangles, normalized to the source surface (left, top, right, bottom)
+      // Drawn over the table showing through (a translucent embedded score display): content is added
+      // as light scaled by contentFade, images faded by imageAlpha, instead of covering what's below
+      bool translucent = false;
+      float contentFade = 1.f;
+      float imageAlpha = 1.f;
    } m_ancillaryRenderSetup;
    static void AddAncillaryContent(VPXRenderContext2D* ctx, float srcX, float srcY, float srcW, float srcH);
    VPXRenderContext2D m_ancillaryRenderContext;
