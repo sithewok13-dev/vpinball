@@ -286,6 +286,9 @@ void Renderer::ApplyTableSettings()
    m_HDRforceDisableToneMapper = m_table->GetSettings().GetPlayer_HDRDisableToneMapper();
    Settings::SetTableOverride_Exposure_Default(m_table->GetExposure());
    m_exposure = m_table->GetSettings().GetTableOverride_Exposure();
+   m_saturation = m_table->GetSettings().GetTableOverride_Saturation();
+   m_contrast = m_table->GetSettings().GetTableOverride_Contrast();
+   m_look = m_table->GetSettings().GetTableOverride_Look();
    m_dynamicAO = m_table->GetSettings().GetPlayer_DynamicAO();
    m_disableAO = m_table->GetSettings().GetPlayer_DisableAO();
    for (int wnd = VPXWindowId::VPXWINDOW_Backglass; wnd <= VPXWindowId::VPXWINDOW_Topper; wnd++)
@@ -2784,6 +2787,11 @@ void Renderer::SetupTonemapping(RenderTarget* renderedRT, RenderTarget* tonemapR
    float agx_params[4];
    PrecompAgXTonemap(agx_params);
    m_renderDevice->m_FBShader->SetVector(ShaderUniform::agx_params, agx_params[0], agx_params[1], agx_params[2], agx_params[3]);
+#ifdef ENABLE_BGFX
+   // Color boost: on display referred output only (VR composes linear layers, HDR displays have their own mapping)
+   const bool boost = !isHdr2020 && (g_pplayer->m_vrDevice == nullptr || m_desktopScenePass);
+   m_renderDevice->m_FBShader->SetVector(ShaderUniform::color_boost, boost ? m_saturation : 1.f, boost ? m_contrast : 1.f, 0.f, 0.f);
+#endif
 
    Texture *const pin = m_table->GetImage(m_table->m_imageColorGrade);
    if (pin)
@@ -4143,6 +4151,38 @@ float Renderer::GetEmbeddedOpacity(VPXWindowId window) const
    return clamp(m_scoreViewOpacity, 0.f, 1.f);
 }
 
+void Renderer::ApplyLook(int look)
+{
+   // Mixes for normal play on a phone or a desktop screen in a lit room, where the tables' night lighting looks
+   // flat and dull: brighter, more vivid, more contrasted, up to lighting the room (scene lighting at a level)
+   struct LookDef { ToneMapper toneMapper; float exposure, saturation, contrast, lightLevel; }; // lightLevel < 0: the table's
+   static constexpr LookDef looks[LOOK_COUNT] = {
+      { TM_NEUTRAL, 1.f, 1.f, 1.f, -1.f }, // Custom: unused
+      { TM_NEUTRAL, 1.f, 1.f, 1.f, -1.f }, // Table's own: tonemapper and exposure set below
+      { TM_NEUTRAL, 1.15f, 1.20f, 1.05f, -1.f }, // Vivid
+      { TM_FILMIC, 1.15f, 1.20f, 1.04f, -1.f }, // Punchy
+      { TM_NEUTRAL, 1.30f, 1.25f, 1.08f, 0.65f }, // Vivid Bright
+      { TM_FILMIC, 1.30f, 1.30f, 1.06f, 0.60f }, // Arcade
+      { TM_NEUTRAL, 1.45f, 1.20f, 1.10f, 0.80f }, // Daylight
+   };
+   m_look = clamp(look, 0, LOOK_COUNT - 1);
+   if (m_look == LOOK_CUSTOM)
+      return;
+   const LookDef& def = looks[m_look];
+   m_toneMapper = m_look == LOOK_TABLE ? GetValidToneMapper(m_table->GetToneMapper()) : GetValidToneMapper(def.toneMapper);
+   m_exposure = m_look == LOOK_TABLE ? m_table->GetExposure() : def.exposure;
+   m_saturation = def.saturation;
+   m_contrast = def.contrast;
+   if (def.lightLevel < 0.f)
+      m_sceneLighting.SetMode(SceneLighting::Mode::Table);
+   else
+   {
+      m_sceneLighting.SetUserLightLevel(def.lightLevel);
+      m_sceneLighting.SetMode(SceneLighting::Mode::User);
+   }
+   MarkShaderDirty();
+}
+
 void Renderer::DrawEmbeddedQuad(RenderTarget* outputRT, int x, int y, int w, int h, float r, float g, float b)
 {
    Vertex3D_NoTex2 vertices[4] = { { 1.f, 1.f, 0.f, 0.f, 0.f, 1.f, 1.f, 1.f }, //
@@ -4398,6 +4438,9 @@ void Renderer::RenderAncillaryWindow(VPXWindowId window, const VPX::RenderOutput
             float agx_params[4];
             PrecompAgXTonemap(agx_params);
             rd->m_FBShader->SetVector(ShaderUniform::agx_params, agx_params[0], agx_params[1], agx_params[2], agx_params[3]);
+#ifdef ENABLE_BGFX
+            rd->m_FBShader->SetVector(ShaderUniform::color_boost, 1.f, 1.f, 0.f, 0.f); // the table's color boost isn't the displays'
+#endif
             rd->DrawFullscreenTexturedQuad(rd->m_FBShader);
          }
       }

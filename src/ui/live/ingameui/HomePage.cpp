@@ -29,6 +29,9 @@ void HomePage::BuildPage()
    ////////////////////////////////////////////////////////////////////////////////////////////////
    AddItem(std::make_unique<InGameUIItem>(InGameUIItem::LabelType::Header, "Table options"s));
 
+   // How tables look (Vivid, Punchy,...), at hand
+   AddItem(std::make_unique<InGameUIItem>("Look"s, ""s, "table/general"s));
+
    if (!m_player->m_ptable->m_rules.empty())
       AddItem(std::make_unique<InGameUIItem>("Table Rules"s, ""s, "table/rules"s));
 

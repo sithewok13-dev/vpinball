@@ -355,6 +355,7 @@ enum class ShaderUniform : unsigned int
    SHADER_UNIFORM(ShaderUniformType::Float4, bloom_dither_colorgrade, 1),
    SHADER_UNIFORM(ShaderUniformType::Float4, exposure_wcg, 1),
    SHADER_UNIFORM(ShaderUniformType::Float4, agx_params, 1),
+   SHADER_UNIFORM(ShaderUniformType::Float4, color_boost, 1),
    SHADER_UNIFORM(ShaderUniformType::Float4, spline1, 1),
    SHADER_UNIFORM(ShaderUniformType::Float2, spline2, 1),
    SHADER_UNIFORM(ShaderUniformType::Float4, SSR_bumpHeight_fresnelRefl_scale_FS, 1),

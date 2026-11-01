@@ -35,6 +35,20 @@ uniform vec4 exposure_wcg;
 // allenwp AgX tonemapping curve parameters, computed on the CPU: x = contrast, y = toe_a, z = slope, w = w
 uniform vec4 agx_params;
 
+// Color boost of the display (low dynamic range) output: x = saturation, y = contrast, 1 leaving it as is
+uniform vec4 color_boost;
+
+// Saturation and contrast applied to a display referred, gamma compressed color (0..1), after tonemapping
+vec3 FBColorBoost(vec3 color)
+{
+   BRANCH if (color_boost.x == 1.0 && color_boost.y == 1.0)
+      return color;
+   const float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+   color = mix(vec3_splat(luma), color, color_boost.x); // saturation: away from (or toward) the color's grey
+   color = (color - 0.5) * color_boost.y + 0.5;           // contrast: around mid grey
+   return saturate(color);
+}
+
 // HDR->HDR spline based remapping
 uniform vec4 spline1;
 uniform vec4 spline2;
@@ -554,11 +568,11 @@ void main()
       if (isLinearFrameBuffer)
       {
           #ifdef TM_OUT_GAMMA
-             result = InvGamma(FBColorGrade(saturate(FBDither(result, v_texcoord0))));
+             result = InvGamma(FBColorGrade(FBColorBoost(saturate(FBDither(result, v_texcoord0)))));
           #else
              result = saturate(FBDither(result, v_texcoord0));
-             BRANCH if (do_color_grade)
-                result = InvGamma(FBColorGrade(FBGamma(result)));
+             BRANCH if (do_color_grade || color_boost.x != 1.0 || color_boost.y != 1.0)
+                result = InvGamma(FBColorGrade(FBColorBoost(FBGamma(result))));
           #endif
           gl_FragColor = vec4(result, 1.0);
       }
@@ -571,7 +585,7 @@ void main()
           #else
              result = FBGamma(  saturate(FBDither(result, v_texcoord0)));
           #endif
-          gl_FragColor = vec4(FBColorGrade(result), 1.0);
+          gl_FragColor = vec4(FBColorGrade(FBColorBoost(result)), 1.0);
       }
    }
 

@@ -12,7 +12,7 @@ namespace VPX::InGameUI
 {
 
 TableMiscPage::TableMiscPage()
-   : InGameUIPage("General Table Settings"s, ""s, SaveMode::Table)
+   : InGameUIPage("General Table Settings"s, ""s, SaveMode::Both)
 {
 }
 
@@ -42,6 +42,18 @@ void TableMiscPage::RequestDynamicRendererUpdate()
 
 void TableMiscPage::BuildPage()
 {
+   // Look: a mix of the settings below to start from, stepped through live; changing one of them by hand makes it 'Custom'
+   AddItem(std::make_unique<InGameUIItem>( //
+      Settings::m_propTableOverride_Look, //
+      [this]() { return m_player->m_renderer->m_look; }, //
+      [this](int, int v)
+      {
+         m_player->m_renderer->ApplyLook(v);
+         RequestDynamicRendererUpdate();
+         RequestRebuild();
+      }));
+   auto custom = [this]() { m_player->m_renderer->m_look = Renderer::LOOK_CUSTOM; };
+
    // Tonemapper, as a table override, if not using WCG display tonemapper
    if (!m_player->m_renderer->m_HDRforceDisableToneMapper || !m_player->m_playfieldWnd->IsWCGBackBuffer())
    {
@@ -49,7 +61,11 @@ void TableMiscPage::BuildPage()
       AddItem(std::make_unique<InGameUIItem>( //
          Settings::m_propTableOverride_ToneMapper, //
          [this]() { return static_cast<int>(m_player->m_renderer->m_toneMapper); }, //
-         [this](int, int v) { m_player->m_renderer->m_toneMapper = static_cast<ToneMapper>(v); }));
+         [this, custom](int, int v)
+         {
+            m_player->m_renderer->m_toneMapper = static_cast<ToneMapper>(v);
+            custom();
+         }));
    }
 
    // Exposure, always saved as a table override setting if different from table embedded value
@@ -58,10 +74,29 @@ void TableMiscPage::BuildPage()
    AddItem(std::make_unique<InGameUIItem>( //
       Settings::m_propTableOverride_Exposure, 100.f, "%4.1f %%"s, //
       [this]() { return m_player->m_renderer->m_exposure; }, //
-      [this](float, float v)
+      [this, custom](float, float v)
       {
          m_player->m_renderer->m_exposure = v;
+         custom();
          m_player->m_ptable->FireOptionEvent(PinTable::OptionEventType::Changed);
+      }));
+
+   // Color boost after tonemapping
+   AddItem(std::make_unique<InGameUIItem>( //
+      Settings::m_propTableOverride_Saturation, 100.f, "%4.0f %%"s, //
+      [this]() { return m_player->m_renderer->m_saturation; }, //
+      [this, custom](float, float v)
+      {
+         m_player->m_renderer->m_saturation = v;
+         custom();
+      }));
+   AddItem(std::make_unique<InGameUIItem>( //
+      Settings::m_propTableOverride_Contrast, 100.f, "%4.0f %%"s, //
+      [this]() { return m_player->m_renderer->m_contrast; }, //
+      [this, custom](float, float v)
+      {
+         m_player->m_renderer->m_contrast = v;
+         custom();
       }));
 
    // Global emission scale, if not overriden on commandline
@@ -81,9 +116,10 @@ void TableMiscPage::BuildPage()
                return 1;
             return 2;
          }, // Stored
-         [this](int, int v)
+         [this, custom](int, int v)
          {
             m_player->m_renderer->m_sceneLighting.SetMode((Renderer::SceneLighting::Mode)v);
+            custom();
             RequestDynamicRendererUpdate();
             RequestRebuild();
          },
@@ -104,9 +140,10 @@ void TableMiscPage::BuildPage()
          AddItem(std::make_unique<InGameUIItem>(
             Settings::m_propPlayer_EmissionScale, 100.f, "%4.1f %%"s,  //
             [this]() { return m_player->m_renderer->m_sceneLighting.GetUserLightLevel(); },
-            [this](float, float v)
+            [this, custom](float, float v)
             {
                m_player->m_renderer->m_sceneLighting.SetUserLightLevel(v);
+               custom();
                RequestDynamicRendererUpdate();
             }));
       }

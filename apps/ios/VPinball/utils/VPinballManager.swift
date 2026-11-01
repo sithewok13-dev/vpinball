@@ -148,7 +148,17 @@ class VPinballManager {
             saveValue(.scoreView, "ScoreViewOpacity", Float(0.2))
         }
 
-        saveValue(.standalone, "PhoneViewDefaults", 4)
+        if applied < 5 {
+            // Tables looking vivid rather than flat on a phone: the 'Vivid' look (in-game menu, Look, for the others),
+            // the same values Renderer::ApplyLook gives it
+            saveValue(.tableOverride, "Look", 2)
+            saveValue(.tableOverride, "ToneMapper", 3) // Neutral
+            saveValue(.tableOverride, "Exposure", Float(1.15))
+            saveValue(.tableOverride, "Saturation", Float(1.2))
+            saveValue(.tableOverride, "Contrast", Float(1.05))
+        }
+
+        saveValue(.standalone, "PhoneViewDefaults", 5)
     }
 
     private static func runOnMain(_ body: @escaping @MainActor () -> Void) {

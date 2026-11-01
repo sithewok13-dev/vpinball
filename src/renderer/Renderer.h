@@ -269,6 +269,14 @@ public:
    ToneMapper m_toneMapper = TM_AGX;
    bool m_HDRforceDisableToneMapper = true;
    float m_exposure = 1.f;
+   // Color boost applied after tonemapping (1 leaving colors as they are), and the look they came from
+   // (TableOverride.Look, see ApplyLook)
+   float m_saturation = 1.f;
+   float m_contrast = 1.f;
+   int m_look = 0;
+   enum Look { LOOK_CUSTOM, LOOK_TABLE, LOOK_VIVID, LOOK_PUNCHY, LOOK_VIVID_BRIGHT, LOOK_ARCADE, LOOK_DAYLIGHT, LOOK_COUNT };
+   // Sets the tonemapper, exposure, color boost and scene lighting of a look
+   void ApplyLook(int look);
 
    CGpuProfiler m_gpu_profiler;
 

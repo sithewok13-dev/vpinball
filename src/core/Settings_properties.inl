@@ -740,6 +740,10 @@ PropFloatSteppedDyn(TableOverride, ViewCabRotation, "Viewport Rotation"s, ""s, 0
 
 PropFloatDyn(TableOverride, Difficulty, "Difficulty"s, "Overall difficulty (affects slope, flipper size, ball trajectories scattering,...)"s, 0.f, 1.f, 1.f);
 PropFloatDyn(TableOverride, Exposure, "Camera Exposure"s, "Overall brightness scale for the rendered scene/table"s, 0.f, 2.f, 1.f);
+PropFloat(TableOverride, Saturation, "Color Saturation"s, "How vivid colors are, applied after tonemapping (100% leaves them as they are)"s, 0.f, 2.f, 1.f);
+PropFloat(TableOverride, Contrast, "Contrast"s, "Contrast around mid grey, applied after tonemapping (100% leaves it as it is)"s, 0.5f, 1.5f, 1.f);
+PropEnum(TableOverride, Look, "Look"s, "A mix of tonemapper, exposure, color saturation, contrast and scene lighting, to start from; 'Custom' once one of them is changed"s, int, 0,
+   "Custom"s, "Table's Own"s, "Vivid"s, "Punchy"s, "Vivid Bright"s, "Arcade"s, "Daylight"s);
 
 PropEnumDyn(
    TableOverride, ToneMapper, "Tonemapper"s, "Colors too bright to be displayed by low dynamic range monitors need to be mapped into a normalized range. Different mappers come at different tradeoffs, depending on each tables setup/lighting."s, int, 0, "Reinhard"s, "AgX"s, "Filmic"s, "Neutral"s);

@@ -25,6 +25,7 @@ enum VPinballSettingsSection: String {
     case standalone = "Standalone"
     case player = "Player"
     case scoreView = "ScoreView"
+    case tableOverride = "TableOverride"
     case pluginDMDUtil = "Plugin.DMDUtil"
 }
 
