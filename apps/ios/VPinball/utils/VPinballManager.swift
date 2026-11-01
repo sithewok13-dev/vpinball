@@ -98,6 +98,31 @@ class VPinballManager {
                                        highFrequencySpeed: highFrequencySpeed,
                                        durationMs: durationMs)
         })
+
+        applyPhoneViewDefaults()
+    }
+
+    /// On a phone, tables are seen head on, filling the screen: VPX's cabinet view, fitted to the
+    /// screen automatically, rather than each table's desktop view, which is made for a wide
+    /// monitor. Applied once, so a view chosen in the in-game menu afterwards is kept.
+    private func applyPhoneViewDefaults() {
+        guard UIDevice.current.userInterfaceIdiom == .phone,
+              loadValue(.standalone, "PhoneViewDefaults", 0) < 1
+        else {
+            return
+        }
+
+        // the screen's size in cm, long side as width as VPX takes it: points are about 1/160 inch
+        let bounds = UIScreen.main.bounds
+        let longSide = Float(max(bounds.width, bounds.height)) / 160 * 2.54
+        let shortSide = Float(min(bounds.width, bounds.height)) / 160 * 2.54
+
+        saveValue(.player, "BGSet", 1) // cabinet
+        saveValue(.player, "CabinetAutofitMode", 1) // fitted on the table's width, without stretching
+        saveValue(.player, "ScreenWidth", longSide)
+        saveValue(.player, "ScreenHeight", shortSide)
+        saveValue(.player, "ScreenPlayerZ", Float(40)) // a phone held at arm's length: cm above the glass
+        saveValue(.standalone, "PhoneViewDefaults", 1)
     }
 
     private static func runOnMain(_ body: @escaping @MainActor () -> Void) {
