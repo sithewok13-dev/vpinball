@@ -41,8 +41,8 @@ jobs:
             rm -rf work && mkdir work && cp tests/assets/test000-default-table.vpx work/table.vpx
             printf '[Player]\nPlayfieldFullScreen = 0\nPlayfieldWidth = 645\nPlayfieldHeight = 1398\nScreenWidth = 15.4\nScreenHeight = 7.1\n%b\n' "$2" > work/vpx.ini
             HOME=$PWD/home xvfb-run -a -s "-screen 0 700x1500x24" timeout 600 "$bin" -Ini "$PWD/work/vpx.ini" -CaptureAttract 1 30 "$PWD/work/table.vpx" noloop > "shots/$1.log" 2>&1 || true
-            f=$(find work -name '*.png' | sort | head -1)
-            [ -n "$f" ] && cp "$f" "shots/$1.png"
+            f=$(find work -name '*.qoi' | sort | head -1)
+            [ -n "$f" ] && cp "$f" "shots/$1.qoi"
             tail -5 "shots/$1.log"
           }
           run 1-today-desktop ''
