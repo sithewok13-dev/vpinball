@@ -61,10 +61,10 @@ InputManager::InputManager(Player* player, Settings& appSettings)
    // RECT definition is left, top, right, bottom in % of screen
    addTouchRegion(RECT { 0, 0, 50, 10 }, GetAddCreditActionId(0), "COIN"s);
    addTouchRegion(RECT { 50, 0, 100, 10 }, GetOpenInGameUIActionId(), "MENU"s);
-   addTouchRegion(RECT { 0, 10, 50, 30 }, GetLeftMagnaActionId(), "MAGNA"s);
-   addTouchRegion(RECT { 50, 10, 100, 30 }, GetRightMagnaActionId(), "MAGNA"s);
-   addTouchRegion(RECT { 0, 30, 50, 60 }, GetLeftNudgeActionId(), "NUDGE"s);
-   addTouchRegion(RECT { 50, 30, 100, 60 }, GetRightNudgeActionId(), "NUDGE"s);
+   // No magna-save regions: few machines have the buttons, and many tables' scripts use them for their own
+   // options (cycling color looks,...), triggered by accident; the side nudges have that room
+   addTouchRegion(RECT { 0, 10, 50, 60 }, GetLeftNudgeActionId(), "NUDGE"s);
+   addTouchRegion(RECT { 50, 10, 100, 60 }, GetRightNudgeActionId(), "NUDGE"s);
    // Each flipper has half of the lower part of the screen, wherever a thumb lands on its side: no
    // forward nudge in between, which thumbs drifting inward used to trigger while flipping
    addTouchRegion(RECT { 0, 60, 50, 90 }, GetLeftFlipperActionId(), "FLIPPER"s);

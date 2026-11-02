@@ -74,8 +74,7 @@ The screen is divided into invisible areas. Touching an area presses that button
 |---|---|
 | Top left | Insert a coin |
 | Top right | Open the [in-game menu](#the-in-game-menu) |
-| Upper left / upper right | Left / right magna-save |
-| Middle left / middle right | Nudge the table left / right |
+| Upper and middle left / right | Nudge the table left / right |
 | Lower left half / lower right half | Left / right flipper |
 | Bottom left | Insert a coin and start a game |
 | Bottom right | Plunger. Hold to pull back, let go to launch |
